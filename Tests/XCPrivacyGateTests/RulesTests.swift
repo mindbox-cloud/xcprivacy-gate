@@ -31,6 +31,7 @@ struct RulesTests {
     func apiWithoutFixturesKeyIsAnError() throws {
         let message = try loadErrorMessage(rulesDocument(removing: "fixtures"))
 
+        #expect(message.contains("rules.json"))
         #expect(message.contains("systemUptime"))
         #expect(message.contains("\"fixtures\""))
     }
