@@ -5,7 +5,6 @@ package struct PackageTarget: Equatable, Sendable {
     package let path: URL
     package let sources: [URL]
     package let manifest: URL?
-    package let resourceRule: String?
 }
 
 package struct PackageDescription: Sendable {
@@ -18,12 +17,12 @@ package struct PackageDescription: Sendable {
 
 package enum PackageReader {
     package static func describe(root: URL) throws -> Data {
-        try Data(Toolchain.run(["swift", "package", "--package-path", root.path, "describe", "--type", "json"], in: nil).utf8)
+        try Data(Toolchain.run(["swift", "package", "--package-path", root.path, "describe", "--type", "json"]).utf8)
     }
 
-    package static func read(description: Data, root: URL) throws -> PackageDescription {
+    package static func read(description: Data) throws -> PackageDescription {
         let package = try decode(description)
-        let base = try canonical(root)
+        let root = URL(fileURLWithPath: package.path, isDirectory: true)
         var violations = package.dependencies.map { dependency in
             Violation(
                 code: "PACKAGE_DEPENDENCY",
@@ -35,7 +34,7 @@ package enum PackageReader {
         for target in package.targets {
             switch target.type {
             case "library":
-                targets.append(target.packageTarget(in: base, violations: &violations))
+                targets.append(target.packageTarget(in: root, violations: &violations))
             case "binary":
                 violations.append(Violation(
                     code: "PACKAGE_DEPENDENCY",
@@ -51,7 +50,7 @@ package enum PackageReader {
         }
         return PackageDescription(
             name: package.name,
-            root: base,
+            root: root,
             iosDeploymentTarget: package.platforms.first(where: { $0.name == "ios" })?.version,
             targets: targets,
             violations: violations
@@ -65,18 +64,11 @@ package enum PackageReader {
             throw ToolError(message: "swift package describe printed unexpected output: \(StrictJSON.message(error, document: "the output"))")
         }
     }
-
-    private static func canonical(_ root: URL) throws -> URL {
-        guard let resolved = realpath(root.path, nil) else {
-            throw ToolError(message: "cannot resolve the package root \(root.path): \(String(cString: strerror(errno)))")
-        }
-        defer { free(resolved) }
-        return URL(fileURLWithPath: String(cString: resolved), isDirectory: true)
-    }
 }
 
 private struct DescribedPackage: Decodable {
     let name: String
+    let path: String
     let platforms: [Platform]
     let dependencies: [Dependency]
     let targets: [Target]
@@ -100,7 +92,6 @@ private struct DescribedPackage: Decodable {
 
     struct Resource: Decodable {
         let path: String
-        let rule: [String: [String: String]]
     }
 }
 
@@ -130,8 +121,7 @@ private extension DescribedPackage.Target {
             name: name,
             path: directory,
             sources: files.filter { $0.pathExtension == "swift" },
-            manifest: declared.map { URL(fileURLWithPath: $0.path, isDirectory: false) },
-            resourceRule: declared?.rule.keys.first
+            manifest: declared.map { URL(fileURLWithPath: $0.path, isDirectory: false) }
         )
     }
 }
