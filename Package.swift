@@ -1,9 +1,9 @@
-// swift-tools-version:6.0
+// swift-tools-version:6.3
 import PackageDescription
 
 let package = Package(
     name: "xcprivacy-gate",
-    platforms: [.macOS(.v14)],
+    platforms: [.macOS(.v26)],
     products: [
         .executable(name: "xcprivacy-gate", targets: ["xcprivacy-gate"])
     ],
