@@ -18,7 +18,7 @@ struct UsageTests {
     }
 
     @Test("a real registry loads")
-    func repositoryRegistryLoads() throws {
+    func realRegistryLoads() throws {
         let usage = try Usage.load(testData("usage/registry.json"), rules: rules, userDefaultsAppGroup: true)
 
         #expect(usage.entries.first?.api == "systemFreeSize")

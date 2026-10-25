@@ -319,8 +319,8 @@ struct PolicyTests {
         #expect(try #require(violations.first { $0.code == "OVERRIDE_EXPIRED" }).message.contains("expired on 2026-10-01"))
     }
 
-    @Test("today's develop reports exactly the four known violations")
-    func developToday() throws {
+    @Test("the sample SDK reports exactly the four known violations")
+    func sampleSDKReportsFourKnownViolations() throws {
         let names = ["Core", "Notifications", "Logger"]
         var manifests: [String: Manifest] = [:]
         for name in names {

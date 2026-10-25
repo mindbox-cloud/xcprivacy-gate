@@ -31,7 +31,7 @@ private struct DescribedResource: Encodable {
 private let manifestTargets = ["Core", "Notifications", "Logger"]
 private let emptyDump = Data(#"{"targets": []}"#.utf8)
 
-private func developPackage(root: URL) -> DescribedPackage {
+private func fourTargetPackage(root: URL) -> DescribedPackage {
     func target(_ name: String, sources: [String], manifest: Bool) -> DescribedTarget {
         let resource = DescribedResource(path: root.appendingPathComponent("\(name)/PrivacyInfo.xcprivacy").path, rule: ["process": [:]])
         return DescribedTarget(name: name, path: name, sources: sources, resources: manifest ? [resource] : nil)
@@ -44,7 +44,7 @@ private func developPackage(root: URL) -> DescribedPackage {
     ])
 }
 
-private func withDevelopTree<Result>(_ body: (URL) throws -> Result) throws -> Result {
+private func withSampleTree<Result>(_ body: (URL) throws -> Result) throws -> Result {
     try withTemporaryDirectory { root in
         for name in manifestTargets {
             let target = root.appendingPathComponent(name, isDirectory: true)
@@ -69,10 +69,10 @@ private func codes(_ violations: [Violation]) -> [String] {
 
 @Suite("Package reader")
 struct PackageReaderTests {
-    @Test("the develop package has four library targets")
-    func developHasFourLibraryTargets() throws {
-        try withDevelopTree { root in
-            let description = try readPackage(developPackage(root: root))
+    @Test("the sample package has four library targets")
+    func samplePackageHasFourLibraryTargets() throws {
+        try withSampleTree { root in
+            let description = try readPackage(fourTargetPackage(root: root))
 
             #expect(description.name == "Sample")
             #expect(description.iosDeploymentTarget == "12.0")
@@ -94,8 +94,8 @@ struct PackageReaderTests {
 
     @Test("a manifest on disk that the target's resources do not list is MANIFEST_NOT_WIRED")
     func unwiredManifestIsReported() throws {
-        try withDevelopTree { root in
-            var package = developPackage(root: root)
+        try withSampleTree { root in
+            var package = fourTargetPackage(root: root)
             package.targets[2].resources = nil
 
             let description = try readPackage(package)
@@ -109,8 +109,8 @@ struct PackageReaderTests {
 
     @Test("a package dependency is PACKAGE_DEPENDENCY")
     func packageDependencyIsReported() throws {
-        try withDevelopTree { root in
-            var package = developPackage(root: root)
+        try withSampleTree { root in
+            var package = fourTargetPackage(root: root)
             package.dependencies = [["identity": "swift-collections", "type": "sourceControl", "url": "https://github.com/apple/swift-collections.git"]]
 
             let violations = try readPackage(package).violations
@@ -122,8 +122,8 @@ struct PackageReaderTests {
 
     @Test("a binary target is PACKAGE_DEPENDENCY and not a scanned target")
     func binaryTargetIsReported() throws {
-        try withDevelopTree { root in
-            var package = developPackage(root: root)
+        try withSampleTree { root in
+            var package = fourTargetPackage(root: root)
             package.targets.append(DescribedTarget(name: "Vendored", path: "Vendored.xcframework", type: "binary", sources: []))
 
             let description = try readPackage(package)
@@ -139,8 +139,8 @@ struct PackageReaderTests {
         arguments: ["Legacy.m", "Legacy.mm", "Legacy.c", "Legacy.cc", "Legacy.cpp", "Legacy.cxx", "Legacy.c++", "Legacy.s", "Legacy.S"]
     )
     func nonSwiftSourceIsUnscannable(file: String) throws {
-        try withDevelopTree { root in
-            var package = developPackage(root: root)
+        try withSampleTree { root in
+            var package = fourTargetPackage(root: root)
             package.targets[2].sources.append("Native/\(file)")
 
             let description = try readPackage(package)
@@ -157,8 +157,8 @@ struct PackageReaderTests {
 
     @Test("test, executable, plugin and macro targets are skipped", arguments: ["test", "executable", "plugin", "macro"])
     func nonLibraryTargetsAreSkipped(type: String) throws {
-        try withDevelopTree { root in
-            var package = developPackage(root: root)
+        try withSampleTree { root in
+            var package = fourTargetPackage(root: root)
             package.targets.append(DescribedTarget(name: "CoreTests", path: "CoreTests", type: type, sources: ["Native.m"]))
 
             let description = try readPackage(package)
@@ -170,8 +170,8 @@ struct PackageReaderTests {
 
     @Test("a target at the package root has paths without a dot component")
     func targetAtPackageRootHasCleanPaths() throws {
-        try withDevelopTree { root in
-            var package = developPackage(root: root)
+        try withSampleTree { root in
+            var package = fourTargetPackage(root: root)
             package.targets = [DescribedTarget(name: "Root", path: ".", sources: ["Sub/A.swift"])]
 
             let target = try #require(readPackage(package).targets.first)
@@ -183,8 +183,8 @@ struct PackageReaderTests {
 
     @Test("a package without library targets is a tool error")
     func noLibraryTargetsIsToolError() throws {
-        try withDevelopTree { root in
-            var package = developPackage(root: root)
+        try withSampleTree { root in
+            var package = fourTargetPackage(root: root)
             package.targets = [DescribedTarget(name: "CoreTests", path: "CoreTests", type: "test", sources: ["Tests.swift"])]
 
             #expect(throws: ToolError.self) { try readPackage(package) }
@@ -193,8 +193,8 @@ struct PackageReaderTests {
 
     @Test("a package without an iOS platform has no deployment target")
     func noIOSPlatformMeansNoDeploymentTarget() throws {
-        try withDevelopTree { root in
-            var package = developPackage(root: root)
+        try withSampleTree { root in
+            var package = fourTargetPackage(root: root)
             package.platforms = [DescribedPlatform(name: "macos", version: "14.0")]
 
             let description = try readPackage(package)
