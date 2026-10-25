@@ -20,13 +20,13 @@ main() {
     return 0
   fi
   git -c user.name="github-actions[bot]" -c user.email="41898282+github-actions[bot]@users.noreply.github.com" \
-    commit --quiet -m "MOBILE-0000: Refresh Apple privacy rules"
+    commit --quiet -m "feat: refresh Apple privacy rules"
   if [ "$open_prs" != "0" ]; then
     git push --quiet origin "$BRANCH"
     gh pr comment "$BRANCH" --body-file "$BODY"
   else
     git push --quiet --force origin "$BRANCH"
-    gh pr create --base "$BASE_BRANCH" --head "$BRANCH" --title "MOBILE-0000: Refresh Apple privacy rules" \
+    gh pr create --base "$BASE_BRANCH" --head "$BRANCH" --title "feat: refresh Apple privacy rules" \
       --body-file "$BODY" --reviewer "$REVIEWER"
   fi
 }
