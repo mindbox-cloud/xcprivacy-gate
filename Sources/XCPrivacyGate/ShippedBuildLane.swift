@@ -12,6 +12,9 @@ struct ShippedBuildLane: BuildConfiguration {
 
     private static let operatingSystems: [Set<String>] = [["iOS"], ["tvOS"], ["watchOS"], ["visionOS", "xrOS"]]
     private static let versionExtremes = [VersionTuple(0), VersionTuple(Int.max)]
+    private static let environments = ["simulator": false, "macCatalyst": false]
+    private static let runtimes = ["_ObjC": true, "_multithreaded": true, "_Native": false]
+    private static let objectFormats = ["MachO": true, "ELF": false, "COFF": false, "Wasm": false]
 
     private let operatingSystemNames: Set<String>
     let languageVersion: VersionTuple
@@ -47,20 +50,27 @@ struct ShippedBuildLane: BuildConfiguration {
         throw UndecidedCondition()
     }
 
-    func isActiveTargetEnvironment(name: String) -> Bool {
-        false
+    func isActiveTargetEnvironment(name: String) throws -> Bool {
+        try Self.answer(name, from: Self.environments)
     }
 
-    func isActiveTargetRuntime(name: String) -> Bool {
-        name == "_ObjC"
+    func isActiveTargetRuntime(name: String) throws -> Bool {
+        try Self.answer(name, from: Self.runtimes)
     }
 
     func isActiveTargetPointerAuthentication(name: String) throws -> Bool {
         throw UndecidedCondition()
     }
 
-    func isActiveTargetObjectFormat(name: String) -> Bool {
-        name == "MachO"
+    func isActiveTargetObjectFormat(name: String) throws -> Bool {
+        try Self.answer(name, from: Self.objectFormats)
+    }
+
+    private static func answer(_ name: String, from known: [String: Bool]) throws -> Bool {
+        guard let active = known[name] else {
+            throw UndecidedCondition()
+        }
+        return active
     }
 }
 
