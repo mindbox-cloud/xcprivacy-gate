@@ -22,14 +22,13 @@ package enum PackageBuilder {
             products: scratch.appending(path: "out/Products/Release-iphoneos", directoryHint: .isDirectory)
         )
         let sdk = try Toolchain.run(["xcrun", "--sdk", "iphoneos", "--show-sdk-path"]).trimmingCharacters(in: .whitespacesAndNewlines)
-        _ = try Toolchain.run([
+        let command = [
             "swift", "build", "--package-path", root.path, "--scratch-path", scratch.path, "--build-system", "swiftbuild",
             "--triple", "arm64-apple-ios", "--sdk", sdk, "-c", "release", "--force-resolved-versions",
             "-Xswiftc", "-index-store-path", "-Xswiftc", build.indexStore.path, "-Xcc", "-index-store-path", "-Xcc", build.indexStore.path
-        ])
-        let missing = targets.map(\.name).filter { !FileManager.default.fileExists(atPath: build.object(of: $0).path) }
-        guard missing.isEmpty else {
-            throw ToolError(message: "swift build left no object for \(missing.joined(separator: ", ")) in \(build.products.path), so the binary scan cannot read those targets")
+        ]
+        for target in targets {
+            _ = try Toolchain.run(command + ["--target", target.name])
         }
         return build
     }

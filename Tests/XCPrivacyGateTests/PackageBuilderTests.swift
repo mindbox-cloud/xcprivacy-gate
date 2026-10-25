@@ -183,8 +183,8 @@ struct PackageBuilderTests {
         #expect(try objects(in: sample.build.products) == ["Core.o", "Logger.o"])
     }
 
-    @Test("a missing product is a tool error naming the target")
-    func missingProductIsToolError() throws {
+    @Test("a target the build cannot produce is a tool error naming it")
+    func targetTheBuildCannotProduceIsToolError() throws {
         try withCanonicalTemporaryDirectory { directory in
             let package = try SamplePackage(at: directory.appending(path: "Sample"), files: oneTargetFiles("public let answer = 42\n"))
             let missing = PackageTarget(
@@ -199,8 +199,7 @@ struct PackageBuilderTests {
                 try PackageBuilder.build(root: package.root, targets: package.targets + [missing], work: directory.appending(path: "work"))
             }
 
-            #expect(error?.message.contains("Notifications") == true)
-            #expect(error?.message.contains("Core") == false)
+            #expect(error?.message.contains("error: Could not find target named 'Notifications'") == true)
         }
     }
 
