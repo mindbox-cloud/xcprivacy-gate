@@ -16,7 +16,7 @@ private struct Sample {
     private let objects: URL
 
     init(in directory: URL) throws {
-        let base = try URL(fileURLWithPath: #require(directory.resourceValues(forKeys: [.canonicalPathKey]).canonicalPath), isDirectory: true)
+        let base = try canonical(directory)
         root = base.appending(path: "repository", directoryHint: .isDirectory)
         store = base.appending(path: "store", directoryHint: .isDirectory)
         objects = base.appending(path: "objects", directoryHint: .isDirectory)

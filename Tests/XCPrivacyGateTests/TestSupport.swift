@@ -7,11 +7,20 @@ let repositoryRoot = URL(fileURLWithPath: #filePath)
     .deletingLastPathComponent()
     .deletingLastPathComponent()
 
-func withTemporaryDirectory<Result>(_ body: (URL) throws -> Result) throws -> Result {
+func makeTemporaryDirectory() throws -> URL {
     let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
     try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+    return directory
+}
+
+func withTemporaryDirectory<Result>(_ body: (URL) throws -> Result) throws -> Result {
+    let directory = try makeTemporaryDirectory()
     defer { try? FileManager.default.removeItem(at: directory) }
     return try body(directory)
+}
+
+func canonical(_ directory: URL) throws -> URL {
+    try URL(fileURLWithPath: #require(directory.resourceValues(forKeys: [.canonicalPathKey]).canonicalPath), isDirectory: true)
 }
 
 func relativeFiles(under directory: URL) throws -> Set<String> {

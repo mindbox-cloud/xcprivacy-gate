@@ -118,9 +118,9 @@ private struct SampleBuild: SuiteTrait, TestScoping {
     @TaskLocal static var current: BuiltSample?
 
     func provideScope(for test: Test, testCase: Test.Case?, performing function: @Sendable () async throws -> Void) async throws {
-        let directory = try canonicalTemporaryDirectory()
+        let directory = try makeTemporaryDirectory()
         defer { try? FileManager.default.removeItem(at: directory) }
-        let package = try SamplePackage(at: directory.appending(path: "Sample", directoryHint: .isDirectory), files: sampleFiles)
+        let package = try SamplePackage(at: canonical(directory).appending(path: "Sample", directoryHint: .isDirectory), files: sampleFiles)
         let contents = try package.contents()
         let work = directory.appending(path: "work", directoryHint: .isDirectory)
         let build = try PackageBuilder.build(root: package.root, targets: package.targets, work: work)
@@ -132,21 +132,6 @@ private struct SampleBuild: SuiteTrait, TestScoping {
 
 extension Trait where Self == SampleBuild {
     fileprivate static var sampleBuild: Self { Self() }
-}
-
-private func canonicalTemporaryDirectory() throws -> URL {
-    let directory = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory)
-    try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
-    guard let canonical = try directory.resourceValues(forKeys: [.canonicalPathKey]).canonicalPath else {
-        throw ToolError(message: "\(directory.path) has no canonical path")
-    }
-    return URL(fileURLWithPath: canonical, isDirectory: true)
-}
-
-private func withCanonicalTemporaryDirectory<Result>(_ body: (URL) throws -> Result) throws -> Result {
-    let directory = try canonicalTemporaryDirectory()
-    defer { try? FileManager.default.removeItem(at: directory) }
-    return try body(directory)
 }
 
 private func objects(in products: URL) throws -> [String] {
@@ -185,7 +170,7 @@ struct PackageBuilderTests {
 
     @Test("a target the build cannot produce is a tool error naming it")
     func targetTheBuildCannotProduceIsToolError() throws {
-        try withCanonicalTemporaryDirectory { directory in
+        try withTemporaryDirectory { directory in
             let package = try SamplePackage(at: directory.appending(path: "Sample"), files: oneTargetFiles("public let answer = 42\n"))
             let missing = PackageTarget(
                 name: "Notifications",
@@ -205,7 +190,7 @@ struct PackageBuilderTests {
 
     @Test("a failing build is a tool error with the compiler's error lines")
     func failingBuildIsToolErrorWithErrorLines() throws {
-        try withCanonicalTemporaryDirectory { directory in
+        try withTemporaryDirectory { directory in
             let package = try SamplePackage(at: directory.appending(path: "Sample"), files: oneTargetFiles("public func broken() -> Int { return \"text\" }\n"))
 
             let error = #expect(throws: ToolError.self) {
@@ -219,7 +204,7 @@ struct PackageBuilderTests {
 
     @Test("a package with a dependency and no Package.resolved is a tool error and gets no Package.resolved")
     func dependencyWithoutResolvedFileIsToolError() throws {
-        try withCanonicalTemporaryDirectory { directory in
+        try withTemporaryDirectory { directory in
             let dependency = try taggedDependency(at: directory.appending(path: "dep"))
             let package = try SamplePackage(at: directory.appending(path: "Sample"), files: dependentFiles(on: dependency))
             let contents = try package.contents()
