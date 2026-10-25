@@ -27,6 +27,20 @@ struct ToolchainTests {
         #expect(output.hasPrefix("o\no\n"))
     }
 
+    @Test("runs that block every concurrency pool thread at once all finish")
+    func runsBlockingEveryPoolThreadFinish() async throws {
+        let width = ProcessInfo.processInfo.activeProcessorCount * 3
+
+        let lengths = try await withThrowingTaskGroup(of: Int.self) { group in
+            for _ in 0..<width {
+                group.addTask { try Toolchain.run(["sh", "-c", "yes e | head -c 300000 >&2; yes o | head -c 300000"]).count }
+            }
+            return try await group.reduce(into: []) { $0.append($1) }
+        }
+
+        #expect(lengths == Array(repeating: 300_000, count: width))
+    }
+
     @Test("output that is not UTF-8 is still a tool error naming the command", arguments: [#"printf '\377'"#, #"printf '\377' >&2; exit 1"#])
     func nonUTF8OutputIsToolError(script: String) throws {
         let error = #expect(throws: ToolError.self) { try Toolchain.run(["sh", "-c", script]) }
