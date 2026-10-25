@@ -116,6 +116,9 @@ private struct ManifestCheck {
             report("MANIFEST_TYPE", "\(Key.domains) must be an array of non-empty strings, found \(value.pythonRepr)")
             return []
         }
+        if tracking && domains.isEmpty {
+            report("TRACKING_DOMAINS", "\(Key.domains) lists no domain while \(Key.tracking) is true (TN3181)")
+        }
         for domain in domains {
             if !tracking {
                 report("TRACKING_DOMAINS", "\(Key.domains) lists \(domain.pythonRepr) while \(Key.tracking) is false (ITMS-91064)")
