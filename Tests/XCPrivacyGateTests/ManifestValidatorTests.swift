@@ -238,6 +238,14 @@ struct ManifestValidatorTests {
         #expect(violations.first?.message.contains("tracking domain \(shown) must be a bare host name") == true)
     }
 
+    @Test("tracking needs at least one tracking domain", arguments: ["<array/>", nil])
+    func trackingNeedsTrackingDomain(domains: String?) throws {
+        let violations = try check(manifestXML(tracking: "<true/>", domains: domains), trackingDisabled: false).violations
+
+        #expect(violations.map(\.code) == ["TRACKING_DOMAINS"])
+        #expect(violations.first?.message.contains("NSPrivacyTrackingDomains lists no domain while NSPrivacyTracking is true") == true)
+    }
+
     @Test("a binary property list manifest is read like the XML one")
     func binaryManifestIsReadLikeXML() throws {
         let xml = try Data(contentsOf: testData("manifests/Mindbox.xcprivacy"))
