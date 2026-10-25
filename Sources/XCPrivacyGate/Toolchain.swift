@@ -4,6 +4,15 @@ import os
 package enum Toolchain {
     private static let stderrTailLength = 2_000
 
+    package static func libIndexStore() throws -> URL {
+        let swift = try URL(fileURLWithPath: run(["xcrun", "--find", "swift"]).trimmingCharacters(in: .whitespacesAndNewlines))
+        let library = swift.deletingLastPathComponent().appending(path: "../lib/libIndexStore.dylib").standardized
+        guard FileManager.default.fileExists(atPath: library.path) else {
+            throw ToolError(message: "\(library.path) does not exist: the selected toolchain cannot read the build index")
+        }
+        return library
+    }
+
     package static func run(_ arguments: [String]) throws -> String {
         let command = arguments.joined(separator: " ")
         let process = Process()
