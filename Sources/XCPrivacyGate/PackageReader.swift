@@ -5,6 +5,13 @@ package struct PackageTarget: Equatable, Sendable {
     package let path: URL
     package let sources: [URL]
     package let manifest: URL?
+
+    package init(name: String, path: URL, sources: [URL], manifest: URL?) {
+        self.name = name
+        self.path = path
+        self.sources = sources
+        self.manifest = manifest
+    }
 }
 
 package struct PackageDescription: Sendable {

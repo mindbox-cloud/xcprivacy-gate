@@ -5,6 +5,13 @@ package struct Manifest: Sendable {
     package let tracking: Bool
     package let domains: [String]
     package let apiTypes: [String: [String]]
+
+    package init(path: URL, tracking: Bool, domains: [String], apiTypes: [String: [String]]) {
+        self.path = path
+        self.tracking = tracking
+        self.domains = domains
+        self.apiTypes = apiTypes
+    }
 }
 
 package enum ManifestValidator {
