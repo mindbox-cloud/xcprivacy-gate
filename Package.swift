@@ -9,7 +9,8 @@ let package = Package(
     ],
     dependencies: [
         .package(url: "https://github.com/swiftlang/indexstore-db.git", revision: "swift-6.3.3-RELEASE"),
-        .package(url: "https://github.com/apple/swift-argument-parser.git", exact: "1.8.2")
+        .package(url: "https://github.com/apple/swift-argument-parser.git", exact: "1.8.2"),
+        .package(url: "https://github.com/swiftlang/swift-syntax.git", exact: "604.0.0")
     ],
     targets: [
         .target(
@@ -25,7 +26,9 @@ let package = Package(
             name: "XCPrivacyGate",
             dependencies: [
                 "XCPrivacyGateRules",
-                .product(name: "IndexStoreDB", package: "indexstore-db")
+                .product(name: "IndexStoreDB", package: "indexstore-db"),
+                .product(name: "SwiftParser", package: "swift-syntax"),
+                .product(name: "SwiftSyntax", package: "swift-syntax")
             ]
         ),
         .executableTarget(

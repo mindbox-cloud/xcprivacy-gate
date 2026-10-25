@@ -1,5 +1,5 @@
 {
-  "originHash" : "30bc0a7ec7301aa917842a9bff825f93f757287ee57f7f94253c56145a683e9d",
+  "originHash" : "74779db91a0c880a0af1317d58c73abb5e18f4a5afe95d36229340fd5fd66fd0",
   "pins" : [
     {
       "identity" : "indexstore-db",
@@ -26,6 +26,15 @@
       "state" : {
         "branch" : "release/6.3",
         "revision" : "1ad9a2d80b6fcde498c2242f509bd1be7d667ff8"
+      }
+    },
+    {
+      "identity" : "swift-syntax",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/swiftlang/swift-syntax.git",
+      "state" : {
+        "revision" : "050f1a346fbbac0ca2cfb15a95274f7bd1cf0ccf",
+        "version" : "604.0.0"
       }
     }
   ],

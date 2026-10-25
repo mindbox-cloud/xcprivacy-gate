@@ -49,7 +49,7 @@ package enum Report {
         violations.isEmpty ? 0 : 1
     }
 
-    private static func repositoryRelative(_ path: String, root: URL) -> String {
+    static func repositoryRelative(_ path: String, root: URL) -> String {
         guard path.hasPrefix("/") else { return path }
         let rootComponents = root.standardizedFileURL.pathComponents
         let pathComponents = URL(fileURLWithPath: path).standardizedFileURL.pathComponents
