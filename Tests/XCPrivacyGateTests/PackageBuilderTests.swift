@@ -1,6 +1,7 @@
 import Foundation
 import Testing
 import XCPrivacyGate
+import XCPrivacyGateRules
 
 private func manifest(_ package: String) -> String {
     "// swift-tools-version:5.9\nimport PackageDescription\n\nlet package = \(package)\n"
@@ -14,7 +15,8 @@ private let sampleFiles = [
             products: [.library(name: "Sample", targets: ["Core"])],
             targets: [
                 .target(name: "Core", dependencies: ["Logger"], resources: [.process("PrivacyInfo.xcprivacy")]),
-                .target(name: "Logger")
+                .target(name: "Logger"),
+                .target(name: "Records")
             ]
         )
         """),
@@ -38,6 +40,13 @@ private let sampleFiles = [
 
         public func log(_ message: String) {
             UserDefaults(suiteName: "com.example.sdk.localState")?.set(message, forKey: "last")
+        }
+
+        """,
+    "Sources/Records/Record.swift": """
+        public struct Record: Codable {
+            public let fileModificationDate: Double
+            public let activeInputModes: [String]
         }
 
         """,
@@ -140,7 +149,7 @@ private func objects(in products: URL) throws -> [String] {
 
 @Suite("Package builder", .sampleBuild)
 struct PackageBuilderTests {
-    @Test("build of a two-target fixture package gives one .o per target and an index store")
+    @Test("build of a fixture package gives one .o per target and an index store")
     func buildGivesObjectPerTargetAndIndexStore() throws {
         let sample = try #require(SampleBuild.current)
 
@@ -150,7 +159,7 @@ struct PackageBuilderTests {
             #expect(FileManager.default.fileExists(atPath: sample.build.products.appending(path: "\(target.name).o").path))
         }
         let modules = try IndexScanner(store: sample.build.indexStore).findings(targets: sample.package.targets, rules: appleRules(), root: sample.package.root)
-        #expect(modules.keys.sorted() == ["Core", "Logger"])
+        #expect(modules.keys.sorted() == ["Core", "Logger", "Records"])
     }
 
     @Test("the build leaves the package directory untouched (no .build, no .swiftpm)")
@@ -165,7 +174,43 @@ struct PackageBuilderTests {
         let sample = try #require(SampleBuild.current)
 
         #expect(sample.contentsBeforeBuild["Sample.xcodeproj/project.pbxproj"] != nil)
-        #expect(try objects(in: sample.build.products) == ["Core.o", "Logger.o"])
+        #expect(try objects(in: sample.build.products) == ["Core.o", "Logger.o", "Records.o"])
+    }
+
+    @Test("a target with a Codable struct whose properties are named fileModificationDate and activeInputModes, built for real, gives no binary findings")
+    func synthesizedCodableKeysAreNoBinaryFindings() throws {
+        let sample = try #require(SampleBuild.current)
+        let records = try #require(sample.package.targets.first { $0.name == "Records" })
+        let object = sample.build.products.appending(path: "Records.o")
+        let keys: Set = ["fileModificationDate", "activeInputModes"]
+        #expect(try BinaryScanner.read([object])[object]?.strings.isSuperset(of: keys) == true)
+
+        let modules = try BinaryScanner.findings(
+            build: sample.build,
+            targets: [records],
+            rules: Rules.load(RulesBundle.directory.appending(path: "rules.json")),
+            usage: Usage(entries: [], overrides: [], privateSuites: [])
+        )
+
+        #expect(modules["Records"]?.findings.map(\.api) == [])
+    }
+
+    @Test("a package with a library target and a macOS-only executable target builds that library's .o and index units")
+    func macOSOnlyExecutableTargetIsNotBuilt() throws {
+        try withTemporaryDirectory { directory in
+            let package = try SamplePackage(at: canonical(directory).appending(path: "Sample"), files: [
+                "Package.swift": manifest(#"Package(name: "Sample", platforms: [.iOS(.v15)], targets: [.target(name: "Core"), .executableTarget(name: "Tool")])"#),
+                "Sources/Core/Core.swift": "public let answer = 42\n",
+                "Sources/Tool/main.swift": "import Foundation\n\nlet process = Process()\nprocess.executableURL = URL(fileURLWithPath: \"/usr/bin/true\")\ntry process.run()\n"
+            ])
+            let libraries = package.targets.filter { $0.name == "Core" }
+
+            let build = try PackageBuilder.build(root: package.root, targets: libraries, work: directory.appending(path: "work"))
+
+            #expect(try objects(in: build.products) == ["Core.o"])
+            let modules = try IndexScanner(store: build.indexStore).findings(targets: libraries, rules: appleRules(), root: package.root)
+            #expect(modules.keys.sorted() == ["Core"])
+        }
     }
 
     @Test("a target the build cannot produce is a tool error naming it")
