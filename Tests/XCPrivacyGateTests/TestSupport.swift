@@ -33,3 +33,19 @@ func testData(_ path: String) throws -> URL {
 func applePage(_ name: String) throws -> [String: Any] {
     try AppleDocs.document(Data(contentsOf: testData(name)), from: name)
 }
+
+func appleRules() throws -> Rules {
+    let required = try AppleDocs.requiredReasons(applePage("nsprivacyaccessedapitype-2026-10-25.json"))
+    var apis: [String: ApiRule] = [:]
+    for (category, body) in required.sorted(by: { $0.key < $1.key }) {
+        for entry in body.apis {
+            apis[entry.api, default: ApiRule(api: entry.api, docc: entry.docc, categories: [])].categories.append(category)
+        }
+    }
+    return try Rules(RulesFile(
+        categories: required.mapValues { CategoryReasons(reasons: $0.reasons) },
+        apis: apis.values.sorted { $0.api < $1.api },
+        collectedDataTypes: AppleDocs.possibleValueNames(applePage("nsprivacycollecteddatatype-2026-10-25.json")),
+        purposes: AppleDocs.possibleValueNames(applePage("nsprivacycollecteddatatypepurposes-2026-10-25.json"))
+    ))
+}
