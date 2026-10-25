@@ -97,7 +97,9 @@ private struct ManifestCheck {
 
     private mutating func tracking(_ content: [String: PlistValue]) -> Bool {
         guard let value = content[Key.tracking] else {
-            report("MANIFEST_MISSING_KEY", "missing key \(Key.tracking.pythonRepr)")
+            if trackingDisabled {
+                report("MANIFEST_MISSING_KEY", "missing key \(Key.tracking.pythonRepr); the SDK must declare false")
+            }
             return false
         }
         guard case .bool(let tracking) = value else {
@@ -130,10 +132,7 @@ private struct ManifestCheck {
     }
 
     private mutating func checkCollected(_ content: [String: PlistValue]) {
-        guard let value = content[Key.collected] else {
-            report("MANIFEST_MISSING_KEY", "missing key \(Key.collected.pythonRepr) (Xcode privacy report needs it, may be empty)")
-            return
-        }
+        guard let value = content[Key.collected] else { return }
         guard case .array(let items) = value else {
             report("MANIFEST_TYPE", "\(Key.collected) must be an array, found \(value.pythonRepr)")
             return

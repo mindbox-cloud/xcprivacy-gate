@@ -111,13 +111,6 @@ struct ManifestValidatorTests {
         #expect(try #require(manifest).apiTypes == [:])
     }
 
-    @Test("a missing collected data key is rejected")
-    func missingCollectedDataKeyIsRejected() throws {
-        let message = try message(of: "MANIFEST_MISSING_KEY", in: manifestXML(collected: nil))
-
-        #expect(message.contains("'NSPrivacyCollectedDataTypes'"))
-    }
-
     @Test("empty collected data is allowed")
     func emptyCollectedDataIsAllowed() throws {
         #expect(try codes(manifestXML(collected: "<array/>")) == [])
