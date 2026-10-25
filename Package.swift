@@ -27,6 +27,7 @@ let package = Package(
             dependencies: [
                 "XCPrivacyGateRules",
                 .product(name: "IndexStoreDB", package: "indexstore-db"),
+                .product(name: "SwiftIfConfig", package: "swift-syntax"),
                 .product(name: "SwiftParser", package: "swift-syntax"),
                 .product(name: "SwiftSyntax", package: "swift-syntax")
             ]

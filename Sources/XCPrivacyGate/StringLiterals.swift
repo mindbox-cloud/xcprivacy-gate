@@ -1,4 +1,5 @@
 import Foundation
+import SwiftIfConfig
 import SwiftParser
 import SwiftSyntax
 
@@ -61,5 +62,19 @@ private final class LiteralCollector: SyntaxVisitor {
             literals.append((value: value, line: node.startLocation(converter: converter).line))
         }
         return .visitChildren
+    }
+
+    override func visit(_ node: IfConfigDeclSyntax) -> SyntaxVisitorContinueKind {
+        let outcomes = ShippedBuildLane.all.map { node.activeClause(in: $0) }
+        guard outcomes.allSatisfy({ $0.diagnostics.isEmpty }) else {
+            return .visitChildren
+        }
+        let shipped = Set(outcomes.compactMap(\.clause))
+        for clause in node.clauses where shipped.contains(clause) {
+            if let elements = clause.elements {
+                walk(elements)
+            }
+        }
+        return .skipChildren
     }
 }
