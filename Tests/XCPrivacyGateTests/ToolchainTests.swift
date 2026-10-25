@@ -19,6 +19,15 @@ struct ToolchainTests {
         #expect(tail.count <= 2_000)
     }
 
+    @Test("a failing command that prints error lines reports those lines instead of the long lines around them")
+    func failingCommandReportsErrorLines() throws {
+        let script = "echo 'Core.swift:1:38: error: cannot convert' >&2; yes c | head -c 6000 | tr -d '\\n' >&2; echo >&2; echo 'error: Build failed' >&2; exit 1"
+
+        let error = #expect(throws: ToolError.self) { try Toolchain.run(["sh", "-c", script]) }
+
+        #expect(error?.message == "sh -c \(script) failed (1): Core.swift:1:38: error: cannot convert\nerror: Build failed")
+    }
+
     @Test("output larger than a pipe buffer on both streams is read in full")
     func largeOutputOnBothStreamsIsRead() throws {
         let output = try Toolchain.run(["sh", "-c", "yes e | head -c 300000 >&2; yes o | head -c 300000"])
