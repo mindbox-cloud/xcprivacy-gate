@@ -21,10 +21,12 @@ package enum Toolchain {
         let errorReader = errors.fileHandleForReading
         let errorRead = OSAllocatedUnfairLock<Result<Data?, any Error>>(initialState: .success(nil))
         let drained = DispatchGroup()
-        DispatchQueue.global().async(group: drained) {
+        drained.enter()
+        Thread {
             let result = Result { try errorReader.readToEnd() }
             errorRead.withLock { $0 = result }
-        }
+            drained.leave()
+        }.start()
         let outputRead = Result { try output.fileHandleForReading.readToEnd() }
         drained.wait()
         process.waitUntilExit()
