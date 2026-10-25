@@ -44,8 +44,8 @@ struct ManifestValidatorTests {
         rules = try appleRules()
     }
 
-    @Test("today's develop manifests are valid", arguments: ["Mindbox", "MindboxLogger", "MindboxNotifications"])
-    func todaysDevelopManifestsAreValid(name: String) throws {
+    @Test("real SDK manifests are valid", arguments: ["Core", "Logger", "Notifications"])
+    func realSDKManifestsAreValid(name: String) throws {
         let xml = try String(contentsOf: testData("manifests/\(name).xcprivacy"), encoding: .utf8)
 
         let (manifest, violations) = try check(xml)
@@ -144,9 +144,9 @@ struct ManifestValidatorTests {
 
     @Test("tracking domains are rejected while tracking is false")
     func domainsWithTrackingFalseAreRejected() throws {
-        let message = try message(of: "TRACKING_DOMAINS", in: manifestXML(domains: "<array><string>api.mindbox.ru</string></array>"))
+        let message = try message(of: "TRACKING_DOMAINS", in: manifestXML(domains: "<array><string>api.example.com</string></array>"))
 
-        #expect(message.contains("'api.mindbox.ru'"))
+        #expect(message.contains("'api.example.com'"))
     }
 
     @Test("a collected data entry needs all four keys and Boolean flags")
@@ -201,7 +201,7 @@ struct ManifestValidatorTests {
     @Test("a missing file is reported")
     func missingFileIsReported() throws {
         let (manifest, violations) = try withTemporaryDirectory { directory in
-            ManifestValidator.parse(directory.appendingPathComponent("PrivacyInfo.xcprivacy"), module: "Mindbox", rules: rules, trackingDisabled: true)
+            ManifestValidator.parse(directory.appendingPathComponent("PrivacyInfo.xcprivacy"), module: "Core", rules: rules, trackingDisabled: true)
         }
 
         #expect(manifest == nil)
@@ -219,22 +219,22 @@ struct ManifestValidatorTests {
             "<key>NSPrivacyCollectedDataTypeTracking</key><false/>",
             with: "<key>NSPrivacyCollectedDataTypeTracking</key><true/>"
         )
-        let xml = manifestXML(tracking: "<true/>", domains: "<array><string>api.mindbox.ru</string></array>", collected: "<array>\(trackedEntry)</array>")
+        let xml = manifestXML(tracking: "<true/>", domains: "<array><string>api.example.com</string></array>", collected: "<array>\(trackedEntry)</array>")
 
         let (manifest, violations) = try check(xml, trackingDisabled: false)
 
         #expect(violations == [])
         let parsed = try #require(manifest)
         #expect(parsed.tracking)
-        #expect(parsed.domains == ["api.mindbox.ru"])
+        #expect(parsed.domains == ["api.example.com"])
     }
 
     @Test("a tracking domain must be a bare host name while tracking is allowed", arguments: [
-        ("https://api.mindbox.ru", "'https://api.mindbox.ru'"),
-        ("mindbox", "'mindbox'"),
-        ("api.mindbox.ru/sdk", "'api.mindbox.ru/sdk'"),
-        ("api..mindbox.ru", "'api..mindbox.ru'"),
-        ("api.mindbox.ru\n", "'api.mindbox.ru\\n'")
+        ("https://api.example.com", "'https://api.example.com'"),
+        ("example", "'example'"),
+        ("api.example.com/sdk", "'api.example.com/sdk'"),
+        ("api..example.com", "'api..example.com'"),
+        ("api.example.com\n", "'api.example.com\\n'")
     ])
     func trackingDomainMustBeBareHostName(domain: String, shown: String) throws {
         let xml = manifestXML(tracking: "<true/>", domains: "<array><string>\(domain)</string></array>")
@@ -255,7 +255,7 @@ struct ManifestValidatorTests {
 
     @Test("a binary property list manifest is read like the XML one")
     func binaryManifestIsReadLikeXML() throws {
-        let xml = try Data(contentsOf: testData("manifests/Mindbox.xcprivacy"))
+        let xml = try Data(contentsOf: testData("manifests/Core.xcprivacy"))
         let binary = try PropertyListSerialization.data(
             fromPropertyList: PropertyListSerialization.propertyList(from: xml, format: nil),
             format: .binary,
@@ -323,7 +323,7 @@ struct ManifestValidatorTests {
     private func check(_ contents: Data, fileName: String = "PrivacyInfo.xcprivacy", trackingDisabled: Bool = true) throws -> (manifest: Manifest?, violations: [Violation]) {
         try withTemporaryDirectory { directory in
             try contents.write(to: directory.appendingPathComponent(fileName))
-            return ManifestValidator.parse(directory.appendingPathComponent("PrivacyInfo.xcprivacy"), module: "Mindbox", rules: rules, trackingDisabled: trackingDisabled)
+            return ManifestValidator.parse(directory.appendingPathComponent("PrivacyInfo.xcprivacy"), module: "Core", rules: rules, trackingDisabled: trackingDisabled)
         }
     }
 

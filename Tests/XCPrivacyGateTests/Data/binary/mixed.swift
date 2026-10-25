@@ -7,7 +7,7 @@ public func mixedProbe(url: URL) -> [Any] {
         ProcessInfo.processInfo.systemUptime,
         attributes?[.systemFreeSize] as Any,
         UserDefaults.standard.bool(forKey: "probe"),
-        UserDefaults(suiteName: "cloud.Mindbox.webview.localState") as Any,
+        UserDefaults(suiteName: "com.example.sdk.localState") as Any,
         mach_absolute_time(),
         values?.contentModificationDate as Any,
     ]

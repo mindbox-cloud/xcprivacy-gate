@@ -3,7 +3,7 @@ import Testing
 import XCPrivacyGate
 
 private struct DescribedPackage: Encodable {
-    var name = "Mindbox"
+    var name = "Sample"
     var path: String
     var platforms = [DescribedPlatform(name: "ios", version: "12.0")]
     var dependencies: [[String: String]] = []
@@ -28,7 +28,7 @@ private struct DescribedResource: Encodable {
     let rule: [String: [String: String]]
 }
 
-private let manifestTargets = ["Mindbox", "MindboxNotifications", "MindboxLogger"]
+private let manifestTargets = ["Core", "Notifications", "Logger"]
 private let emptyDump = Data(#"{"targets": []}"#.utf8)
 
 private func developPackage(root: URL) -> DescribedPackage {
@@ -38,9 +38,9 @@ private func developPackage(root: URL) -> DescribedPackage {
     }
     return DescribedPackage(path: root.path, targets: [
         target("SDKVersionProvider", sources: ["SDKVersionProvider.swift"], manifest: false),
-        target("MindboxNotifications", sources: ["MindboxNotificationService.swift", "Models/ImageFormat.swift"], manifest: true),
-        target("MindboxLogger", sources: ["Network/Enums/SDKLogsStatus.swift"], manifest: true),
-        target("Mindbox", sources: ["CoreController/CoreController.swift", "Mindbox.swift"], manifest: true)
+        target("Notifications", sources: ["NotificationService.swift", "Models/ImageFormat.swift"], manifest: true),
+        target("Logger", sources: ["Network/Enums/SDKLogsStatus.swift"], manifest: true),
+        target("Core", sources: ["CoreController/CoreController.swift", "Core.swift"], manifest: true)
     ])
 }
 
@@ -74,19 +74,19 @@ struct PackageReaderTests {
         try withDevelopTree { root in
             let description = try readPackage(developPackage(root: root))
 
-            #expect(description.name == "Mindbox")
+            #expect(description.name == "Sample")
             #expect(description.iosDeploymentTarget == "12.0")
             #expect(description.root.path == root.path)
             #expect(description.violations == [])
             let targets = Dictionary(uniqueKeysWithValues: description.targets.map { ($0.name, $0) })
-            #expect(Set(targets.keys) == ["Mindbox", "MindboxNotifications", "SDKVersionProvider", "MindboxLogger"])
-            let mindbox = try #require(targets["Mindbox"])
-            #expect(mindbox.path.path == root.appendingPathComponent("Mindbox").path)
-            #expect(mindbox.sources.map(\.path) == [
-                root.appendingPathComponent("Mindbox/CoreController/CoreController.swift").path,
-                root.appendingPathComponent("Mindbox/Mindbox.swift").path
+            #expect(Set(targets.keys) == ["Core", "Notifications", "SDKVersionProvider", "Logger"])
+            let core = try #require(targets["Core"])
+            #expect(core.path.path == root.appendingPathComponent("Core").path)
+            #expect(core.sources.map(\.path) == [
+                root.appendingPathComponent("Core/CoreController/CoreController.swift").path,
+                root.appendingPathComponent("Core/Core.swift").path
             ])
-            #expect(mindbox.manifest?.path == root.appendingPathComponent("Mindbox/PrivacyInfo.xcprivacy").path)
+            #expect(core.manifest?.path == root.appendingPathComponent("Core/PrivacyInfo.xcprivacy").path)
             let provider = try #require(targets["SDKVersionProvider"])
             #expect(provider.manifest == nil)
         }
@@ -101,9 +101,9 @@ struct PackageReaderTests {
             let description = try readPackage(package)
 
             #expect(codes(description.violations) == ["MANIFEST_NOT_WIRED"])
-            #expect(description.violations.first?.module == "MindboxLogger")
-            #expect(description.violations.first?.file == root.appendingPathComponent("MindboxLogger/PrivacyInfo.xcprivacy").path)
-            #expect(description.targets.first { $0.name == "MindboxLogger" }?.manifest == nil)
+            #expect(description.violations.first?.module == "Logger")
+            #expect(description.violations.first?.file == root.appendingPathComponent("Logger/PrivacyInfo.xcprivacy").path)
+            #expect(description.targets.first { $0.name == "Logger" }?.manifest == nil)
         }
     }
 
@@ -147,10 +147,10 @@ struct PackageReaderTests {
 
             #expect(codes(description.violations) == ["UNSCANNABLE_SOURCE"])
             let violation = try #require(description.violations.first)
-            #expect(violation.module == "MindboxLogger")
+            #expect(violation.module == "Logger")
             #expect(violation.message.contains("Native/\(file)"))
-            #expect(violation.file == root.appendingPathComponent("MindboxLogger/Native/\(file)").path)
-            let logger = try #require(description.targets.first { $0.name == "MindboxLogger" })
+            #expect(violation.file == root.appendingPathComponent("Logger/Native/\(file)").path)
+            let logger = try #require(description.targets.first { $0.name == "Logger" })
             #expect(logger.sources.map(\.lastPathComponent) == ["SDKLogsStatus.swift"])
         }
     }
@@ -159,11 +159,11 @@ struct PackageReaderTests {
     func nonLibraryTargetsAreSkipped(type: String) throws {
         try withDevelopTree { root in
             var package = developPackage(root: root)
-            package.targets.append(DescribedTarget(name: "MindboxTests", path: "MindboxTests", type: type, sources: ["Native.m"]))
+            package.targets.append(DescribedTarget(name: "CoreTests", path: "CoreTests", type: type, sources: ["Native.m"]))
 
             let description = try readPackage(package)
 
-            #expect(!description.targets.contains { $0.name == "MindboxTests" })
+            #expect(!description.targets.contains { $0.name == "CoreTests" })
             #expect(description.violations == [])
         }
     }
@@ -185,7 +185,7 @@ struct PackageReaderTests {
     func noLibraryTargetsIsToolError() throws {
         try withDevelopTree { root in
             var package = developPackage(root: root)
-            package.targets = [DescribedTarget(name: "MindboxTests", path: "MindboxTests", type: "test", sources: ["Tests.swift"])]
+            package.targets = [DescribedTarget(name: "CoreTests", path: "CoreTests", type: "test", sources: ["Tests.swift"])]
 
             #expect(throws: ToolError.self) { try readPackage(package) }
         }
@@ -203,7 +203,7 @@ struct PackageReaderTests {
         }
     }
 
-    @Test("output that is not describe's JSON is a tool error", arguments: ["not json", #"{"name": "Mindbox"}"#, "[]"])
+    @Test("output that is not describe's JSON is a tool error", arguments: ["not json", #"{"name": "Sample"}"#, "[]"])
     func unexpectedOutputIsToolError(output: String) {
         let error = #expect(throws: ToolError.self) { try PackageReader.read(description: Data(output.utf8), dump: emptyDump) }
 

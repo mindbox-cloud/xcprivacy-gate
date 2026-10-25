@@ -45,9 +45,9 @@ struct RulesTests {
 
     @Test("an unknown top-level key is a tool error naming it")
     func unknownTopLevelKeyIsAnError() throws {
-        let message = try loadErrorMessage(rulesDocument(topLevel: ["appleSdkListIncludesMindbox": false]))
+        let message = try loadErrorMessage(rulesDocument(topLevel: ["appleSdkListIncludesSample": false]))
 
-        #expect(message.contains("\"appleSdkListIncludesMindbox\""))
+        #expect(message.contains("\"appleSdkListIncludesSample\""))
     }
 
     @Test("an unknown key in an API is a tool error naming the API and the key")
