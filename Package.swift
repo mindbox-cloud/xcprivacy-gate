@@ -36,6 +36,7 @@ let package = Package(
             name: "xcprivacy-gate",
             dependencies: [
                 "XCPrivacyGate",
+                "XCPrivacyGateRules",
                 .product(name: "ArgumentParser", package: "swift-argument-parser")
             ]
         ),

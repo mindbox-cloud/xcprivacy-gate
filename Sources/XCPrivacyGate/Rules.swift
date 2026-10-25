@@ -141,6 +141,18 @@ package struct RulesFile: Codable, Equatable, Sendable {
     }
 }
 
+extension RulesFile {
+    static func load(_ url: URL) throws -> (file: RulesFile, rules: Rules) {
+        let path = url.standardizedFileURL
+        do {
+            let file = try StrictJSON.decode(RulesFile.self, contentsOf: path, document: "the rules")
+            return (file, try Rules(file))
+        } catch let error as ToolError {
+            throw ToolError(message: "\(path.path): \(error.message)")
+        }
+    }
+}
+
 package struct Rules: Sendable {
     package let categories: [String: [String: String]]
     package let apis: [String: ApiRule]
@@ -148,12 +160,7 @@ package struct Rules: Sendable {
     package let purposes: Set<String>
 
     package static func load(_ url: URL) throws -> Rules {
-        let file = url.standardizedFileURL
-        do {
-            return try Rules(StrictJSON.decode(RulesFile.self, contentsOf: file, document: "the rules"))
-        } catch let error as ToolError {
-            throw ToolError(message: "\(file.path): \(error.message)")
-        }
+        try RulesFile.load(url).rules
     }
 
     package init(_ file: RulesFile) throws {

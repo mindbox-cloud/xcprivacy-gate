@@ -25,7 +25,7 @@
 
       ],
       "usrs" : [
-
+        "c:@NSFileCreationDate"
       ]
     },
     {
@@ -53,7 +53,7 @@
 
       ],
       "usrs" : [
-
+        "c:@NSFileModificationDate"
       ]
     },
     {
@@ -81,7 +81,8 @@
 
       ],
       "usrs" : [
-
+        "c:objc(cs)UIDocument(im)fileModificationDate",
+        "c:objc(cs)UIDocument(py)fileModificationDate"
       ]
     },
     {
@@ -109,7 +110,7 @@
 
       ],
       "usrs" : [
-
+        "c:@NSURLContentModificationDateKey"
       ]
     },
     {
@@ -137,7 +138,7 @@
 
       ],
       "usrs" : [
-
+        "c:@NSURLCreationDateKey"
       ]
     },
     {
@@ -166,7 +167,7 @@
 
       ],
       "usrs" : [
-
+        "c:@F@getattrlist"
       ]
     },
     {
@@ -194,7 +195,7 @@
 
       ],
       "usrs" : [
-
+        "c:@F@getattrlistbulk"
       ]
     },
     {
@@ -223,7 +224,7 @@
 
       ],
       "usrs" : [
-
+        "c:@F@fgetattrlist"
       ]
     },
     {
@@ -251,7 +252,7 @@
 
       ],
       "usrs" : [
-
+        "c:@F@stat"
       ]
     },
     {
@@ -279,7 +280,7 @@
 
       ],
       "usrs" : [
-
+        "c:@F@fstat"
       ]
     },
     {
@@ -307,7 +308,7 @@
 
       ],
       "usrs" : [
-
+        "c:@F@fstatat"
       ]
     },
     {
@@ -335,7 +336,7 @@
 
       ],
       "usrs" : [
-
+        "c:@F@lstat"
       ]
     },
     {
@@ -364,7 +365,7 @@
 
       ],
       "usrs" : [
-
+        "c:@F@getattrlistat"
       ]
     },
     {
@@ -392,7 +393,8 @@
 
       ],
       "usrs" : [
-
+        "c:objc(cs)NSProcessInfo(im)systemUptime",
+        "c:objc(cs)NSProcessInfo(py)systemUptime"
       ]
     },
     {
@@ -420,7 +422,7 @@
 
       ],
       "usrs" : [
-
+        "c:@F@mach_absolute_time"
       ]
     },
     {
@@ -448,7 +450,7 @@
 
       ],
       "usrs" : [
-
+        "c:@NSURLVolumeAvailableCapacityKey"
       ]
     },
     {
@@ -476,7 +478,7 @@
 
       ],
       "usrs" : [
-
+        "c:@NSURLVolumeAvailableCapacityForImportantUsageKey"
       ]
     },
     {
@@ -504,7 +506,7 @@
 
       ],
       "usrs" : [
-
+        "c:@NSURLVolumeAvailableCapacityForOpportunisticUsageKey"
       ]
     },
     {
@@ -532,7 +534,7 @@
 
       ],
       "usrs" : [
-
+        "c:@NSURLVolumeTotalCapacityKey"
       ]
     },
     {
@@ -560,7 +562,7 @@
 
       ],
       "usrs" : [
-
+        "c:@NSFileSystemFreeSize"
       ]
     },
     {
@@ -588,7 +590,7 @@
 
       ],
       "usrs" : [
-
+        "c:@NSFileSystemSize"
       ]
     },
     {
@@ -616,7 +618,7 @@
 
       ],
       "usrs" : [
-
+        "c:@F@statfs"
       ]
     },
     {
@@ -644,7 +646,7 @@
 
       ],
       "usrs" : [
-
+        "c:@F@statvfs"
       ]
     },
     {
@@ -672,7 +674,7 @@
 
       ],
       "usrs" : [
-
+        "c:@F@fstatfs"
       ]
     },
     {
@@ -700,7 +702,7 @@
 
       ],
       "usrs" : [
-
+        "c:@F@fstatvfs"
       ]
     },
     {
@@ -728,7 +730,8 @@
 
       ],
       "usrs" : [
-
+        "c:objc(cs)UITextInputMode(cm)activeInputModes",
+        "c:objc(cs)UITextInputMode(cpy)activeInputModes"
       ]
     },
     {
@@ -756,7 +759,7 @@
         "c:objc(cs)NSUserDefaults("
       ],
       "usrs" : [
-
+        "c:objc(cs)NSUserDefaults(im)initWithSuiteName:"
       ]
     }
   ],

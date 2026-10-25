@@ -21,24 +21,40 @@ package struct IndexScanner {
     }
 
     package func findings(targets: [PackageTarget], rules: Rules, root: URL) throws -> [String: ModuleFindings] {
-        let database = FileManager.default.temporaryDirectory.appending(path: "xcprivacy-gate-index-\(UUID().uuidString)", directoryHint: .isDirectory)
-        defer { try? FileManager.default.removeItem(at: database) }
-        return try scan(targets: targets, rules: rules, root: URL(fileURLWithPath: Self.canonicalPath(of: root), isDirectory: true), database: database)
+        let matchers = rules.apis.values.sorted { $0.api < $1.api }.map(UsrMatcher.init)
+        return try read(targets.flatMap(\.sources), root: root) { index, root in
+            var modules: [String: ModuleFindings] = [:]
+            for target in targets {
+                modules[target.name] = Self.findings(in: target, index: index, matchers: matchers, root: root)
+            }
+            return modules
+        }
     }
 
-    private func scan(targets: [PackageTarget], rules: Rules, root: URL, database: URL) throws -> [String: ModuleFindings] {
+    package func usrs(in sources: [URL], root: URL) throws -> [URL: Set<String>] {
+        try read(sources, root: root) { index, _ in
+            var usrs: [URL: Set<String>] = [:]
+            for source in sources {
+                usrs[source] = Set(Self.references(in: source, index: index).map(\.symbol.usr))
+            }
+            return usrs
+        }
+    }
+
+    private func read<Result>(_ sources: [URL], root: URL, _ body: (IndexStoreDB, URL) -> Result) throws -> Result {
+        let database = FileManager.default.temporaryDirectory.appending(path: "xcprivacy-gate-index-\(UUID().uuidString)", directoryHint: .isDirectory)
+        defer { try? FileManager.default.removeItem(at: database) }
+        return try scan(sources, root: URL(fileURLWithPath: Self.canonicalPath(of: root), isDirectory: true), database: database, body)
+    }
+
+    private func scan<Result>(_ sources: [URL], root: URL, database: URL, _ body: (IndexStoreDB, URL) -> Result) throws -> Result {
         let index = try open(database)
-        let unindexed = targets.flatMap(\.sources).filter { index.dateOfLatestUnitFor(filePath: $0.path) == nil }
+        let unindexed = sources.filter { index.dateOfLatestUnitFor(filePath: $0.path) == nil }
         guard unindexed.isEmpty else {
             let files = unindexed.map { Self.repositoryPath(of: $0, root: root) }.joined(separator: ", ")
             throw ToolError(message: "the build index has no data for \(files): the build did not compile them, so the source scan cannot read them")
         }
-        let matchers = rules.apis.values.sorted { $0.api < $1.api }.map(UsrMatcher.init)
-        var modules: [String: ModuleFindings] = [:]
-        for target in targets {
-            modules[target.name] = Self.findings(in: target, index: index, matchers: matchers, root: root)
-        }
-        return modules
+        return body(index, root)
     }
 
     private func open(_ database: URL) throws -> IndexStoreDB {
@@ -57,7 +73,7 @@ package struct IndexScanner {
         var usesStandardDefaults = false
         for source in target.sources {
             let file = repositoryPath(of: source, root: root)
-            for occurrence in index.symbolOccurrences(inFilePath: source.path).sorted() where occurrence.roles.isDisjoint(with: [.definition, .declaration]) {
+            for occurrence in references(in: source, index: index) {
                 let symbol = occurrence.symbol
                 usesStandardDefaults = usesStandardDefaults || standardDefaults.contains(symbol.usr)
                 findings += matchers.filter { $0.matches(symbol.usr) }.map { matcher in
@@ -66,6 +82,10 @@ package struct IndexScanner {
             }
         }
         return ModuleFindings(findings: findings, usesStandardDefaults: usesStandardDefaults, privateSuites: [])
+    }
+
+    private static func references(in source: URL, index: IndexStoreDB) -> [SymbolOccurrence] {
+        index.symbolOccurrences(inFilePath: source.path).sorted().filter { $0.roles.isDisjoint(with: [.definition, .declaration]) }
     }
 
     private static func repositoryPath(of source: URL, root: URL) -> String {
