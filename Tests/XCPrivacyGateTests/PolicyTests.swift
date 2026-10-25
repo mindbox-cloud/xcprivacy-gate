@@ -32,8 +32,8 @@ private func manifest(_ apiTypes: [String: [String]]) -> Manifest {
     Manifest(path: URL(fileURLWithPath: "/package/Core/PrivacyInfo.xcprivacy"), tracking: false, domains: [], apiTypes: apiTypes)
 }
 
-private func finding(_ api: String, _ categories: Set<String>, file: String = "Core/Foo.swift", line: Int = 1) -> Finding {
-    Finding(api: api, categories: categories, file: file, line: line, evidence: api)
+private func finding(_ api: String, _ categories: Set<String>, file: String = "Core/Foo.swift", line: Int = 1, evidence: String? = nil) -> Finding {
+    Finding(api: api, categories: categories, file: file, line: line, evidence: evidence ?? api)
 }
 
 private func compiled(_ api: String, _ categories: Set<String>, evidence: String? = nil) -> Finding {
@@ -43,6 +43,11 @@ private func compiled(_ api: String, _ categories: Set<String>, evidence: String
 private func uses(_ findings: Finding..., standard: Bool = false, suites: Set<String> = []) -> ModuleFindings {
     ModuleFindings(findings: findings, usesStandardDefaults: standard, privateSuites: suites)
 }
+
+private let indexAndLiteralUptime = uses(
+    finding("systemUptime", [bootTime], line: 4, evidence: "getter:systemUptime"),
+    finding("systemUptime", [bootTime], line: 4, evidence: "string literal")
+)
 
 private func registry(_ entries: UsageEntry..., overrides: [Override] = [], suites: [String] = [webViewSuite]) -> Usage {
     Usage(entries: entries, overrides: overrides, privateSuites: suites)
@@ -206,6 +211,30 @@ struct PolicyTests {
         #expect(codes(undeclared) == ["MISSING_CATEGORY", "UNREGISTERED_CALL"])
         let missing = try #require(undeclared.first { $0.code == "MISSING_CATEGORY" })
         #expect(missing.message.contains("(mach_absolute_time at Core/Foo.swift:1)"))
+    }
+
+    @Test("two findings of one API at one file and line give one UNREGISTERED_CALL")
+    func twoFindingsAtOneCallSiteGiveOneUnregisteredCall() {
+        let found = uses(finding("UserDefaults", [userDefaults], line: 7, evidence: "standard"), finding("UserDefaults", [userDefaults], line: 7, evidence: "getter:standard"))
+
+        let violations = evaluate(found, declares: [userDefaults: ["CA92.1"]], userDefaultsAppGroup: false)
+
+        #expect(codes(violations) == ["UNREGISTERED_CALL"])
+        #expect(violations.first?.line == 7)
+    }
+
+    @Test("index and string literal findings at one file and line give one UNREGISTERED_CALL")
+    func indexAndLiteralFindingsAtOneCallSiteGiveOneUnregisteredCall() {
+        #expect(codes(evaluate(indexAndLiteralUptime, declares: [bootTime: ["35F9.1"]])) == ["UNREGISTERED_CALL"])
+    }
+
+    @Test("a MISSING_CATEGORY message lists a call site once")
+    func missingCategoryListsCallSiteOnce() throws {
+        let violations = evaluate(indexAndLiteralUptime, declares: [:])
+
+        #expect(codes(violations) == ["MISSING_CATEGORY", "UNREGISTERED_CALL"])
+        let missing = try #require(violations.first { $0.code == "MISSING_CATEGORY" })
+        #expect(missing.message.components(separatedBy: "systemUptime at Core/Foo.swift:4").count == 2)
     }
 
     @Test("UserDefaults requires the App Group reason")
