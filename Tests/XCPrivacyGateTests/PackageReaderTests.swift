@@ -55,8 +55,12 @@ private func withDevelopTree<Result>(_ body: (URL) throws -> Result) throws -> R
     }
 }
 
-private func readPackage(_ package: DescribedPackage) throws -> PackageDescription {
-    try PackageReader.read(description: JSONEncoder().encode(package), dump: emptyDump)
+private func readPackage(_ package: DescribedPackage, dump: Data = emptyDump) throws -> PackageDescription {
+    try PackageReader.read(description: JSONEncoder().encode(package), dump: dump)
+}
+
+private func samplePackage(_ targets: String...) -> DescribedPackage {
+    DescribedPackage(name: "Sample", path: "/sample", targets: targets.map { DescribedTarget(name: $0, path: $0, sources: ["\($0).swift"]) })
 }
 
 private func codes(_ violations: [Violation]) -> [String] {
@@ -271,6 +275,48 @@ struct PackageReaderTests {
             let swifty = try #require(description.targets.first)
             #expect(swifty.manifest == nil)
             #expect(description.violations == [])
+        }
+    }
+
+    @Test(
+        "a swift define of DEBUG marks the target only when a release build for a shipped platform gets it",
+        arguments: [
+            (#"{"tool": "swift", "kind": {"define": {"_0": "DEBUG"}}}"#, true),
+            (#"{"tool": "swift", "kind": {"define": {"_0": "DEBUG"}}, "condition": {"config": "debug", "platformNames": []}}"#, false),
+            (#"{"tool": "swift", "kind": {"define": {"_0": "DEBUG"}}, "condition": {"platformNames": ["macos"]}}"#, false),
+            (#"{"tool": "swift", "kind": {"define": {"_0": "DEBUG"}}, "condition": {"platformNames": ["ios"]}}"#, true),
+            (#"{"tool": "swift", "kind": {"define": {"_0": "DEBUG"}}, "condition": {"config": "release", "platformNames": ["macos", "watchos"]}}"#, true),
+            (#"{"tool": "c", "kind": {"define": {"_0": "DEBUG"}}}"#, false),
+            (#"{"tool": "swift", "kind": {"define": {"_0": "OTHER"}}}"#, false),
+            (#"{"tool": "swift", "kind": {"enableUpcomingFeature": {"_0": "ExistentialAny"}}}"#, false)
+        ]
+    )
+    func releaseDebugDefineMarksTarget(setting: String, marked: Bool) throws {
+        let dump = #"{"targets": [{"name": "Core", "settings": [\#(setting)]}, {"name": "Logger", "settings": []}]}"#
+
+        let targets = try readPackage(samplePackage("Core", "Logger"), dump: Data(dump.utf8)).targets
+
+        #expect(targets.map(\.definesDebugInRelease) == [marked, false])
+    }
+
+    @Test("output that is not dump-package's JSON is a tool error")
+    func unexpectedDumpIsToolError() {
+        let error = #expect(throws: ToolError.self) { try readPackage(samplePackage("Core"), dump: Data("not json".utf8)) }
+
+        #expect(error?.message.hasPrefix("swift package dump-package printed unexpected output: ") == true)
+    }
+
+    @Test("SwiftPM's dump of an unconditional DEBUG define marks only that target")
+    func realDumpMarksReleaseDebugTarget() throws {
+        let targets = """
+            .target(name: "Core", swiftSettings: [.define("DEBUG")]),
+            .target(name: "Logger", swiftSettings: [.define("DEBUG", .when(configuration: .debug))])
+            """
+        try withTemporaryDirectory { directory in
+            let description = try describeAndRead(targets: targets, files: ["Sources/Core/Core.swift", "Sources/Logger/Logger.swift"], in: directory)
+
+            let marked = Dictionary(uniqueKeysWithValues: description.targets.map { ($0.name, $0.definesDebugInRelease) })
+            #expect(marked == ["Core": true, "Logger": false])
         }
     }
 

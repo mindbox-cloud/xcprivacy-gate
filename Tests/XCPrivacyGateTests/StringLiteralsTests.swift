@@ -131,11 +131,19 @@ struct StringLiteralsTests {
         "a clause no shipped build compiles is skipped and its #else counts",
         arguments: [
             "os(macOS)", "os(Linux)", "targetEnvironment(simulator)", "targetEnvironment(macCatalyst)", "DEBUG",
-            "_runtime(_Native)", "objectFormat(ELF)", "_endian(big)", "!_hasAtomicBitWidth(_128)"
+            "_runtime(_Native)", "objectFormat(ELF)", "objectFormat(COFF)", "objectFormat(Wasm)", "_endian(big)", "!_hasAtomicBitWidth(_128)"
         ]
     )
     func unshippedClauseIsSkipped(condition: String) {
         #expect(branchLiterals(condition) == [elseBranch])
+    }
+
+    @Test(
+        "a clause every shipped build compiles drops its #else",
+        arguments: ["_runtime(_ObjC)", "_runtime(_multithreaded)", "objectFormat(MachO)", "_endian(little)"]
+    )
+    func everyShippedBuildDropsElse(condition: String) {
+        #expect(branchLiterals(condition) == [ifBranch])
     }
 
     @Test(
@@ -153,7 +161,8 @@ struct StringLiteralsTests {
         "a condition no shipped build can decide keeps every clause",
         arguments: [
             "SWIFT_PACKAGE", "canImport(UIKit)", "arch(arm64)", "os(macOS) || canImport(X)",
-            "_ptrauth(arm64e)", "hasFeature(StrictConcurrency)", "hasAttribute(retroactive)"
+            "_ptrauth(arm64e)", "hasFeature(StrictConcurrency)", "hasAttribute(retroactive)",
+            "_runtime(_Embedded)", "targetEnvironment(exclave)", "objectFormat(XCOFF)"
         ]
     )
     func undecidableConditionKeepsEveryClause(condition: String) {
@@ -240,6 +249,16 @@ struct StringLiteralsTests {
         #expect(logger.privateSuites.isEmpty)
     }
 
+    @Test("#if DEBUG keeps both clauses in a target that defines DEBUG for release and drops the DEBUG clause otherwise")
+    func releaseDebugKeepsDebugClause() throws {
+        let source = ["#if DEBUG", #"let a = "NSFileCreationDate""#, "#else", #"let b = "NSFileSystemSize""#, "#endif"]
+
+        let modules = try scan([loader: source, "Logger/Log.swift": source], debugInRelease: ["Core"])
+
+        #expect(calls(try #require(modules["Core"])) == ["creationDate \(loader) 2", "systemSize \(loader) 4"])
+        #expect(calls(try #require(modules["Logger"])) == ["systemSize Logger/Log.swift 4"])
+    }
+
     @Test("an unreadable source is a tool error naming the file")
     func unreadableSourceIsToolError() throws {
         try withTemporaryDirectory { root in
@@ -256,7 +275,7 @@ struct StringLiteralsTests {
         try #require(scan(files)[name])
     }
 
-    private func scan(_ files: [String: [String]]) throws -> [String: ModuleFindings] {
+    private func scan(_ files: [String: [String]], debugInRelease: Set<String> = []) throws -> [String: ModuleFindings] {
         try withTemporaryDirectory { root in
             var sources: [String: [URL]] = [:]
             for (path, lines) in files.sorted(by: { $0.key < $1.key }) {
@@ -265,7 +284,7 @@ struct StringLiteralsTests {
                 try Data(lines.joined(separator: "\n").utf8).write(to: file)
                 sources[String(path.prefix { $0 != "/" }), default: []].append(file)
             }
-            let targets = sources.map { PackageTarget(name: $0.key, path: root.appending(path: $0.key), sources: $0.value, manifest: nil, definesDebugInRelease: false) }
+            let targets = sources.map { PackageTarget(name: $0.key, path: root.appending(path: $0.key), sources: $0.value, manifest: nil, definesDebugInRelease: debugInRelease.contains($0.key)) }
             return try StringLiterals.findings(targets: targets, rules: rules, usage: usage, root: root)
         }
     }
