@@ -111,6 +111,11 @@ struct ManifestValidatorTests {
         #expect(try #require(manifest).apiTypes == [:])
     }
 
+    @Test("missing collected data is allowed")
+    func missingCollectedDataIsAllowed() throws {
+        #expect(try codes(manifestXML(collected: nil)) == [])
+    }
+
     @Test("empty collected data is allowed")
     func emptyCollectedDataIsAllowed() throws {
         #expect(try codes(manifestXML(collected: "<array/>")) == [])
@@ -121,11 +126,20 @@ struct ManifestValidatorTests {
         #expect(try codes(manifestXML(tracking: "<true/>")).contains("TRACKING_ENABLED"))
     }
 
-    @Test("a missing tracking key is rejected")
-    func missingTrackingIsRejected() throws {
+    @Test("a missing tracking key is rejected while trackingDisabled is on")
+    func missingTrackingIsRejectedWhileTrackingDisabledIsOn() throws {
         let message = try message(of: "MANIFEST_MISSING_KEY", in: manifestXML(tracking: nil))
 
-        #expect(message.contains("'NSPrivacyTracking'"))
+        #expect(message.contains("missing key 'NSPrivacyTracking'; the SDK must declare false"))
+    }
+
+    @Test("a missing tracking key is allowed when trackingDisabled is off")
+    func missingTrackingIsAllowedWhenTrackingDisabledIsOff() throws {
+        let (manifest, violations) = try check(manifestXML(tracking: nil), trackingDisabled: false)
+
+        #expect(violations == [])
+        let parsed = try #require(manifest)
+        #expect(!parsed.tracking)
     }
 
     @Test("tracking domains are rejected while tracking is false")
