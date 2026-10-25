@@ -1,7 +1,7 @@
 import Foundation
 
 package enum PlistValue: Sendable {
-    case dictionary([(key: String, value: PlistValue)])
+    case dictionary([String: PlistValue])
     case array([PlistValue])
     case string(String)
     case bool(Bool)
@@ -45,9 +45,11 @@ package enum PlistReader {
         case let array as [Any]:
             return .array(try array.map(value(of:)))
         case let dictionary as [String: Any]:
-            return .dictionary(try dictionary.sorted { $0.key.pythonPrecedes($1.key) }.map { entry throws(PlistReadError) in
-                (key: entry.key, value: try value(of: entry.value))
-            })
+            var values: [String: PlistValue] = [:]
+            for (key, item) in dictionary {
+                values[key] = try value(of: item)
+            }
+            return .dictionary(values)
         default:
             throw .invalid("unsupported value of type \(type(of: object))")
         }
@@ -141,7 +143,7 @@ extension PlistValue {
     var pythonRepr: String {
         switch self {
         case .dictionary(let entries):
-            "{" + entries.map { "\($0.key.pythonRepr): \($0.value.pythonRepr)" }.joined(separator: ", ") + "}"
+            "{" + entries.sorted { $0.key.pythonPrecedes($1.key) }.map { "\($0.key.pythonRepr): \($0.value.pythonRepr)" }.joined(separator: ", ") + "}"
         case .array(let items):
             "[" + items.map(\.pythonRepr).joined(separator: ", ") + "]"
         case .string(let text):

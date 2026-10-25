@@ -29,8 +29,8 @@ private enum Key {
     static let dataTracking = "NSPrivacyCollectedDataTypeTracking"
     static let dataPurposes = "NSPrivacyCollectedDataTypePurposes"
     static let topLevel: Set = [tracking, domains, collected, apiTypes]
-    static let apiEntry = [apiType, apiReasons]
-    static let dataEntry = [dataType, dataLinked, dataTracking, dataPurposes]
+    static let apiEntry: Set = [apiType, apiReasons]
+    static let dataEntry: Set = [dataType, dataLinked, dataTracking, dataPurposes]
 }
 
 private struct ManifestCheck {
@@ -70,7 +70,7 @@ private struct ManifestCheck {
             }
             return nil
         }
-        guard let content = root.dictionary else {
+        guard case .dictionary(let content) = root else {
             report("MANIFEST_UNREADABLE", "top level is \(root.pythonTypeName), expected a dictionary")
             return nil
         }
@@ -137,23 +137,23 @@ private struct ManifestCheck {
         }
         var seen: Set<String> = []
         for item in items {
-            if let fields = fields(of: item, keys: Key.dataEntry, code: "MANIFEST_DATA_ENTRY_KEYS", entry: "collected data entry") {
-                checkDataEntry(fields, seen: &seen)
-            }
+            guard let entry = fields(of: item, keys: Key.dataEntry, code: "MANIFEST_DATA_ENTRY_KEYS", entry: "collected data entry"),
+                  let type = entry[Key.dataType], let linked = entry[Key.dataLinked], let tracking = entry[Key.dataTracking],
+                  let purposes = entry[Key.dataPurposes] else { continue }
+            checkDataEntry(type: type, linked: linked, tracking: tracking, purposes: purposes, seen: &seen)
         }
     }
 
-    private mutating func fields(of item: PlistValue, keys: [String], code: String, entry: String) -> [PlistValue]? {
-        if let dictionary = item.dictionary, Set(dictionary.keys) == Set(keys) {
-            return keys.compactMap { dictionary[$0] }
+    private mutating func fields(of item: PlistValue, keys: Set<String>, code: String, entry: String) -> [String: PlistValue]? {
+        if case .dictionary(let fields) = item, Set(fields.keys) == keys {
+            return fields
         }
-        let found = item.dictionary.map { PlistValue.list($0.keys.pythonSorted()) } ?? item
+        let found = if case .dictionary(let fields) = item { PlistValue.list(fields.keys.pythonSorted()) } else { item }
         report(code, "\(entry) must have exactly \(PlistValue.list(keys.pythonSorted()).pythonRepr), found \(found.pythonRepr)")
         return nil
     }
 
-    private mutating func checkDataEntry(_ fields: [PlistValue], seen: inout Set<String>) {
-        let (type, linked, tracking, purposes) = (fields[0], fields[1], fields[2], fields[3])
+    private mutating func checkDataEntry(type: PlistValue, linked: PlistValue, tracking: PlistValue, purposes: PlistValue, seen: inout Set<String>) {
         let label = type.pythonStr
         checkDataType(type, seen: &seen)
         for (key, value) in [(Key.dataLinked, linked), (Key.dataTracking, tracking)] where !value.isBool {
@@ -200,9 +200,9 @@ private struct ManifestCheck {
         }
         var result: [String: [String]] = [:]
         for item in items {
-            guard let fields = fields(of: item, keys: Key.apiEntry, code: "MANIFEST_API_ENTRY_KEYS", entry: "API entry") else { continue }
-            let type = fields[0]
-            let reasons = reasons(fields[1], category: type)
+            guard let entry = fields(of: item, keys: Key.apiEntry, code: "MANIFEST_API_ENTRY_KEYS", entry: "API entry"),
+                  let type = entry[Key.apiType], let reasonsValue = entry[Key.apiReasons] else { continue }
+            let reasons = reasons(reasonsValue, category: type)
             guard let category = type.stringValue, knownReasons(of: category) != nil else {
                 report("MANIFEST_UNKNOWN_CATEGORY", "unknown required-reason category \(type.pythonRepr)")
                 continue
@@ -255,11 +255,6 @@ private struct ManifestCheck {
 }
 
 private extension PlistValue {
-    var dictionary: [String: PlistValue]? {
-        guard case .dictionary(let entries) = self else { return nil }
-        return Dictionary(entries.map { ($0.key, $0.value) }) { first, _ in first }
-    }
-
     var stringValue: String? {
         guard case .string(let text) = self else { return nil }
         return text
