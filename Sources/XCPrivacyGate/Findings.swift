@@ -38,4 +38,18 @@ extension ModuleFindings {
             privateSuites: privateSuites.union(other.privateSuites)
         )
     }
+
+    func onePerCallSite() -> ModuleFindings {
+        var callSites: Set<CallSite> = []
+        let unique = findings
+            .sorted { ($0.api, $0.file ?? "", $0.line ?? 0, $0.evidence) < ($1.api, $1.file ?? "", $1.line ?? 0, $1.evidence) }
+            .filter { callSites.insert(CallSite(api: $0.api, file: $0.file, line: $0.line)).inserted }
+        return ModuleFindings(findings: unique, usesStandardDefaults: usesStandardDefaults, privateSuites: privateSuites)
+    }
+}
+
+private struct CallSite: Hashable {
+    let api: String
+    let file: String?
+    let line: Int?
 }

@@ -105,15 +105,16 @@ private struct ModuleUse {
     let merged: ModuleFindings
 
     init(source: ModuleFindings, binary: ModuleFindings) {
-        let sourceAPIs = Set(source.findings.map(\.api))
+        let callSites = source.onePerCallSite()
+        let sourceAPIs = Set(callSites.findings.map(\.api))
         let binaryOnly = ModuleFindings(
             findings: binary.findings.filter { !sourceAPIs.contains($0.api) },
             usesStandardDefaults: binary.usesStandardDefaults,
             privateSuites: binary.privateSuites
         )
-        self.source = source.findings
+        self.source = callSites.findings
         self.binaryOnly = binaryOnly.findings
-        merged = source.merging(binaryOnly)
+        merged = callSites.merging(binaryOnly)
     }
 }
 
