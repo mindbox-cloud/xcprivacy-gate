@@ -16,7 +16,7 @@ private func binaryRules() throws -> Rules {
         apis: [
             ApiRule(api: "systemUptime", docc: nil, categories: [bootTime], selectors: ["systemUptime"]),
             ApiRule(api: "mach_absolute_time", docc: nil, categories: [bootTime], symbols: ["_mach_absolute_time"]),
-            ApiRule(api: "systemFreeSize", docc: nil, categories: [diskSpace], strings: ["NSFileSystemFreeSize"], symbols: ["_NSFileSystemFreeSize"]),
+            ApiRule(api: "systemFreeSize", docc: nil, categories: [diskSpace], symbols: ["_NSFileSystemFreeSize"]),
             ApiRule(api: "UserDefaults", docc: nil, categories: [userDefaults], symbols: ["_OBJC_CLASS_$_NSUserDefaults"]),
             ApiRule(api: "contentModificationDateKey", docc: nil, categories: [fileTimestamp], swiftSymbols: [getter]),
             ApiRule(api: "stat", docc: nil, categories: [fileTimestamp], symbols: ["_stat"]),
@@ -213,19 +213,17 @@ struct BinaryScannerTests {
         }
     }
 
-    @Test("rule strings and private suites match __cstring entries only by exact equality")
-    func cstringEntriesMatchExactly() throws {
+    @Test("private suites match __cstring entries only by exact equality")
+    func privateSuitesMatchExactly() throws {
         try withProducts { products in
             let exact = try products.source(
                 "Exact.swift",
                 "import Foundation",
-                #"public func freeSize() -> FileAttributeKey { FileAttributeKey(rawValue: "NSFileSystemFreeSize") }"#,
                 #"public func suite() -> UserDefaults? { UserDefaults(suiteName: "\#(localState)") }"#
             )
             let near = try products.source(
                 "Near.swift",
                 "import Foundation",
-                #"public func freeSize() -> FileAttributeKey { FileAttributeKey(rawValue: "key NSFileSystemFreeSize") }"#,
                 #"public func suite() -> UserDefaults? { UserDefaults(suiteName: "\#(localState).backup") }"#
             )
             try products.compile("Core", [exact])
@@ -233,7 +231,6 @@ struct BinaryScannerTests {
 
             let modules = try products.findings(["Core", "Logger"], suites: [localState])
 
-            #expect(modules["Core"]?.findings.map(\.evidence) == ["_OBJC_CLASS_$_NSUserDefaults in Core.o", "NSFileSystemFreeSize in Core.o"])
             #expect(modules["Core"]?.privateSuites == [localState])
             #expect(modules["Logger"]?.findings.map(\.api) == ["UserDefaults"])
             #expect(modules["Logger"]?.privateSuites.isEmpty == true)

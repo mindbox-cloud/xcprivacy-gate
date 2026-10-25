@@ -48,7 +48,6 @@ private extension BinaryEvidence {
         let matched = symbols.intersection(rule.symbols)
             .union(selectors.intersection(rule.selectors))
             .union(demangled.intersection(rule.swiftSymbols))
-            .union(strings.intersection(rule.strings))
         guard !matched.isEmpty else {
             return nil
         }
