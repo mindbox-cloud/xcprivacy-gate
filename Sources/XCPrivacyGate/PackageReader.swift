@@ -19,7 +19,6 @@ package struct PackageTarget: Equatable, Sendable {
 package struct PackageDescription: Sendable {
     package let name: String
     package let root: URL
-    package let iosDeploymentTarget: String?
     package let targets: [PackageTarget]
     package let violations: [Violation]
 }
@@ -66,7 +65,6 @@ package enum PackageReader {
         return PackageDescription(
             name: package.name,
             root: root,
-            iosDeploymentTarget: package.platforms.first(where: { $0.name == "ios" })?.version,
             targets: targets,
             violations: violations
         )
@@ -84,14 +82,8 @@ package enum PackageReader {
 private struct DescribedPackage: Decodable {
     let name: String
     let path: String
-    let platforms: [Platform]
     let dependencies: [Dependency]
     let targets: [Target]
-
-    struct Platform: Decodable {
-        let name: String
-        let version: String
-    }
 
     struct Dependency: Decodable {
         let identity: String

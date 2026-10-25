@@ -5,14 +5,8 @@ import XCPrivacyGate
 private struct DescribedPackage: Encodable {
     var name = "Sample"
     var path: String
-    var platforms = [DescribedPlatform(name: "ios", version: "12.0")]
     var dependencies: [[String: String]] = []
     var targets: [DescribedTarget]
-}
-
-private struct DescribedPlatform: Encodable {
-    let name: String
-    let version: String
 }
 
 private struct DescribedTarget: Encodable {
@@ -75,7 +69,6 @@ struct PackageReaderTests {
             let description = try readPackage(fourTargetPackage(root: root))
 
             #expect(description.name == "Sample")
-            #expect(description.iosDeploymentTarget == "12.0")
             #expect(description.root.path == root.path)
             #expect(description.violations == [])
             let targets = Dictionary(uniqueKeysWithValues: description.targets.map { ($0.name, $0) })
@@ -191,18 +184,6 @@ struct PackageReaderTests {
         }
     }
 
-    @Test("a package without an iOS platform has no deployment target")
-    func noIOSPlatformMeansNoDeploymentTarget() throws {
-        try withSampleTree { root in
-            var package = fourTargetPackage(root: root)
-            package.platforms = [DescribedPlatform(name: "macos", version: "14.0")]
-
-            let description = try readPackage(package)
-
-            #expect(description.iosDeploymentTarget == nil)
-        }
-    }
-
     @Test("output that is not describe's JSON is a tool error", arguments: ["not json", #"{"name": "Sample"}"#, "[]"])
     func unexpectedOutputIsToolError(output: String) {
         let error = #expect(throws: ToolError.self) { try PackageReader.read(description: Data(output.utf8), dump: emptyDump) }
@@ -235,7 +216,6 @@ struct PackageReaderTests {
             let description = try describeAndRead(targets: targets, files: files, in: directory)
 
             #expect(description.name == "Probe")
-            #expect(description.iosDeploymentTarget == "15.0")
             #expect(!description.root.path.contains("/link"))
             #expect(description.targets.map(\.name).sorted() == ["Legacy", "Swifty"])
             let swifty = try #require(description.targets.first { $0.name == "Swifty" })

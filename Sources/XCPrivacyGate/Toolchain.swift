@@ -49,7 +49,9 @@ package enum Toolchain {
         }
         guard process.terminationStatus == 0 else {
             let stderr = String(bytes: errorData, encoding: .utf8) ?? "stderr is not UTF-8"
-            let tail = stderr.suffix(stderrTailLength).trimmingCharacters(in: .whitespacesAndNewlines)
+            let errorLines = stderr.split(whereSeparator: \.isNewline).filter { $0.contains("error:") }
+            let log = errorLines.isEmpty ? stderr : errorLines.joined(separator: "\n")
+            let tail = log.suffix(stderrTailLength).trimmingCharacters(in: .whitespacesAndNewlines)
             throw ToolError(message: "\(command) failed (\(process.terminationStatus)): \(tail)")
         }
         guard let text = String(bytes: outputData, encoding: .utf8) else {
