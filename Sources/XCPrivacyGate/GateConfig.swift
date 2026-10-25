@@ -1,12 +1,12 @@
 import Foundation
 
-public struct GateConfig: Equatable, Sendable {
-    public let usage: URL
-    public let packagePath: URL
-    public let userDefaultsAppGroup: Bool
-    public let trackingDisabled: Bool
+package struct GateConfig: Equatable, Sendable {
+    package let usage: URL
+    package let packagePath: URL
+    package let userDefaultsAppGroup: Bool
+    package let trackingDisabled: Bool
 
-    public static func load(_ url: URL) throws -> GateConfig {
+    package static func load(_ url: URL) throws -> GateConfig {
         let file = url.standardizedFileURL
         do {
             return try GateConfig(file: file)

@@ -1,7 +1,7 @@
 import Foundation
 
-public enum RulesBundle {
-    public static var directory: URL {
+package enum RulesBundle {
+    package static var directory: URL {
         Bundle.module.resourceURL ?? Bundle.module.bundleURL
     }
 }

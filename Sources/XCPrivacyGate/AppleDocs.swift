@@ -1,11 +1,11 @@
 import Foundation
 
-public enum AppleDocs {
-    public typealias RequiredReasonCategory = (reasons: [String: String], apis: [(api: String, docc: String?)])
+package enum AppleDocs {
+    package typealias RequiredReasonCategory = (reasons: [String: String], apis: [(api: String, docc: String?)])
 
     private static let categoryPrefix = "NSPrivacyAccessedAPICategory"
 
-    public static func document(_ data: Data, from source: String) throws -> [String: Any] {
+    package static func document(_ data: Data, from source: String) throws -> [String: Any] {
         let object: Any
         do {
             object = try JSONSerialization.jsonObject(with: data, options: .fragmentsAllowed)
@@ -18,7 +18,7 @@ public enum AppleDocs {
         return document
     }
 
-    public static func requiredReasons(_ doc: [String: Any]) throws -> [String: RequiredReasonCategory] {
+    package static func requiredReasons(_ doc: [String: Any]) throws -> [String: RequiredReasonCategory] {
         let page = DocCNode(doc)
         let references = try page.node("references")
         var result: [String: RequiredReasonCategory] = [:]
@@ -43,7 +43,7 @@ public enum AppleDocs {
         return result
     }
 
-    public static func possibleValueNames(_ doc: [String: Any]) throws -> [String] {
+    package static func possibleValueNames(_ doc: [String: Any]) throws -> [String] {
         let names = try possibleValues(DocCNode(doc)).map { try $0.string("name") ?? "" }
         guard !names.contains("") else {
             throw ToolError(message: "a possible value has no name")
@@ -51,7 +51,7 @@ public enum AppleDocs {
         return names
     }
 
-    public static func text(_ doc: [String: Any]) throws -> String {
+    package static func text(_ doc: [String: Any]) throws -> String {
         let page = DocCNode(doc)
         let references = try page.node("references")
         var lines = [try page.node("metadata").string("title") ?? "", try inlineText(page.nodes("abstract"), references: references)]

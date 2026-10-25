@@ -1,18 +1,18 @@
 import Foundation
 
-public struct ApiRule: Codable, Equatable, Sendable {
-    public var api: String
-    public var docc: String?
-    public var categories: [String]
-    public var strings: [String]
-    public var usrPrefixes: [String]
-    public var fixtures: [String]
-    public var usrs: [String]
-    public var symbols: [String]
-    public var selectors: [String]
-    public var swiftSymbols: [String]
+package struct ApiRule: Codable, Equatable, Sendable {
+    package var api: String
+    package var docc: String?
+    package var categories: [String]
+    package var strings: [String]
+    package var usrPrefixes: [String]
+    package var fixtures: [String]
+    package var usrs: [String]
+    package var symbols: [String]
+    package var selectors: [String]
+    package var swiftSymbols: [String]
 
-    public init(
+    package init(
         api: String,
         docc: String?,
         categories: [String],
@@ -49,7 +49,7 @@ public struct ApiRule: Codable, Equatable, Sendable {
         case swiftSymbols
     }
 
-    public init(from decoder: Decoder) throws {
+    package init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         let api = try container.decode(String.self, forKey: .api)
         do {
@@ -71,7 +71,7 @@ public struct ApiRule: Codable, Equatable, Sendable {
         }
     }
 
-    public func encode(to encoder: Encoder) throws {
+    package func encode(to encoder: Encoder) throws {
         var container = encoder.container(keyedBy: CodingKeys.self)
         try container.encode(api, forKey: .api)
         try container.encode(docc, forKey: .docc)
@@ -94,10 +94,10 @@ public struct ApiRule: Codable, Equatable, Sendable {
     }
 }
 
-public struct CategoryReasons: Codable, Equatable, Sendable {
-    public var reasons: [String: String]
+package struct CategoryReasons: Codable, Equatable, Sendable {
+    package var reasons: [String: String]
 
-    public init(reasons: [String: String]) {
+    package init(reasons: [String: String]) {
         self.reasons = reasons
     }
 
@@ -105,19 +105,19 @@ public struct CategoryReasons: Codable, Equatable, Sendable {
         case reasons
     }
 
-    public init(from decoder: Decoder) throws {
+    package init(from decoder: Decoder) throws {
         try decoder.rejectUnknownKeys(of: CodingKeys.self)
         reasons = try decoder.container(keyedBy: CodingKeys.self).decode([String: String].self, forKey: .reasons)
     }
 }
 
-public struct RulesFile: Codable, Equatable, Sendable {
-    public var categories: [String: CategoryReasons]
-    public var apis: [ApiRule]
-    public var collectedDataTypes: [String]
-    public var purposes: [String]
+package struct RulesFile: Codable, Equatable, Sendable {
+    package var categories: [String: CategoryReasons]
+    package var apis: [ApiRule]
+    package var collectedDataTypes: [String]
+    package var purposes: [String]
 
-    public init(categories: [String: CategoryReasons], apis: [ApiRule], collectedDataTypes: [String], purposes: [String]) {
+    package init(categories: [String: CategoryReasons], apis: [ApiRule], collectedDataTypes: [String], purposes: [String]) {
         self.categories = categories
         self.apis = apis
         self.collectedDataTypes = collectedDataTypes
@@ -131,7 +131,7 @@ public struct RulesFile: Codable, Equatable, Sendable {
         case purposes
     }
 
-    public init(from decoder: Decoder) throws {
+    package init(from decoder: Decoder) throws {
         try decoder.rejectUnknownKeys(of: CodingKeys.self)
         let container = try decoder.container(keyedBy: CodingKeys.self)
         categories = try container.decode([String: CategoryReasons].self, forKey: .categories)
@@ -141,13 +141,13 @@ public struct RulesFile: Codable, Equatable, Sendable {
     }
 }
 
-public struct Rules: Sendable {
-    public let categories: [String: [String: String]]
-    public let apis: [String: ApiRule]
-    public let dataTypes: Set<String>
-    public let purposes: Set<String>
+package struct Rules: Sendable {
+    package let categories: [String: [String: String]]
+    package let apis: [String: ApiRule]
+    package let dataTypes: Set<String>
+    package let purposes: Set<String>
 
-    public static func load(_ url: URL) throws -> Rules {
+    package static func load(_ url: URL) throws -> Rules {
         let file = url.standardizedFileURL
         do {
             return try Rules(StrictJSON.decode(RulesFile.self, contentsOf: file, document: "the rules"))
@@ -156,7 +156,7 @@ public struct Rules: Sendable {
         }
     }
 
-    public init(_ file: RulesFile) throws {
+    package init(_ file: RulesFile) throws {
         let categories = file.categories.mapValues(\.reasons)
         var apis: [String: ApiRule] = [:]
         for rule in file.apis {

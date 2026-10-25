@@ -1,13 +1,13 @@
 import Foundation
 
-public struct Violation: Equatable, Sendable {
-    public let code: String
-    public let module: String?
-    public let message: String
-    public let file: String?
-    public let line: Int?
+package struct Violation: Equatable, Sendable {
+    package let code: String
+    package let module: String?
+    package let message: String
+    package let file: String?
+    package let line: Int?
 
-    public init(code: String, module: String?, message: String, file: String? = nil, line: Int? = nil) {
+    package init(code: String, module: String?, message: String, file: String? = nil, line: Int? = nil) {
         self.code = code
         self.module = module
         self.message = message
@@ -16,18 +16,18 @@ public struct Violation: Equatable, Sendable {
     }
 }
 
-public struct ToolError: Error, CustomStringConvertible {
-    public let message: String
+package struct ToolError: Error, CustomStringConvertible {
+    package let message: String
 
-    public init(message: String) {
+    package init(message: String) {
         self.message = message
     }
 
-    public var description: String { message }
+    package var description: String { message }
 }
 
-public enum Report {
-    public static func annotation(_ violation: Violation, root: URL) -> String {
+package enum Report {
+    package static func annotation(_ violation: Violation, root: URL) -> String {
         var properties: [String] = []
         if let file = violation.file, !file.isEmpty {
             properties.append("file=\(escapeProperty(repositoryRelative(file, root: root)))")
@@ -39,13 +39,13 @@ public enum Report {
         return "::error \(properties.joined(separator: ","))::\(escapeData(violation.message))"
     }
 
-    public static func summary(title: String, violations: [Violation]) -> String {
+    package static func summary(title: String, violations: [Violation]) -> String {
         let noun = violations.count == 1 ? "violation" : "violations"
         let header = "Privacy manifest gate, \(title): \(violations.count) \(noun)"
         return ([header] + violations.map { "\($0.code) \($0.message)" }).joined(separator: "\n")
     }
 
-    public static func exitCode(violations: [Violation]) -> Int32 {
+    package static func exitCode(violations: [Violation]) -> Int32 {
         violations.isEmpty ? 0 : 1
     }
 

@@ -5,7 +5,6 @@ let package = Package(
     name: "xcprivacy-gate",
     platforms: [.macOS(.v14)],
     products: [
-        .library(name: "XCPrivacyGate", targets: ["XCPrivacyGate"]),
         .executable(name: "xcprivacy-gate", targets: ["xcprivacy-gate"])
     ],
     dependencies: [
