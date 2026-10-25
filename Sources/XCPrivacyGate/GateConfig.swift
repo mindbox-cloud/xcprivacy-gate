@@ -75,61 +75,6 @@ private struct RawConfig: Decodable {
     }
 
     init(contentsOf file: URL) throws {
-        let data: Data
-        do {
-            data = try Data(contentsOf: file)
-        } catch {
-            throw ToolError(message: "cannot read the config: \(error.localizedDescription)")
-        }
-        do {
-            self = try JSONDecoder().decode(RawConfig.self, from: data)
-        } catch let error as DecodingError {
-            throw ToolError(message: Self.describe(error))
-        }
-    }
-
-    private static func describe(_ error: DecodingError) -> String {
-        switch error {
-        case .keyNotFound(let key, let context):
-            "missing key \(quoted(context.codingPath + [key]))"
-        case .typeMismatch(_, let context), .valueNotFound(_, let context):
-            context.codingPath.isEmpty ? "the config must be a JSON object" : "wrong type for key \(quoted(context.codingPath))"
-        case .dataCorrupted:
-            "not valid JSON"
-        @unknown default:
-            "invalid config: \(error)"
-        }
-    }
-}
-
-private func quoted(_ path: [any CodingKey]) -> String {
-    "\"\(path.map(\.stringValue).joined(separator: "."))\""
-}
-
-private struct AnyKey: CodingKey {
-    let stringValue: String
-    var intValue: Int? { nil }
-
-    init(_ stringValue: String) {
-        self.stringValue = stringValue
-    }
-
-    init?(stringValue: String) {
-        self.init(stringValue)
-    }
-
-    init?(intValue: Int) {
-        return nil
-    }
-}
-
-private extension Decoder {
-    func rejectUnknownKeys<Keys: CodingKey & CaseIterable>(of keys: Keys.Type) throws {
-        let known = Set(Keys.allCases.map(\.stringValue))
-        let container = try container(keyedBy: AnyKey.self)
-        let unknown = container.allKeys.map(\.stringValue).filter { !known.contains($0) }.sorted()
-        if let first = unknown.first {
-            throw ToolError(message: "unknown key \(quoted(codingPath + [AnyKey(first)]))")
-        }
+        self = try StrictJSON.decode(RawConfig.self, contentsOf: file, document: "the config")
     }
 }

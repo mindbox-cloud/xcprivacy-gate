@@ -139,11 +139,7 @@ struct GateConfigTests {
     @Test("the rules bundle holds rules.json, every fixture and tn3181.txt")
     func rulesBundleHoldsRulesFixturesAndTechnote() throws {
         let directory = RulesBundle.directory
-        let sourceRules = URL(fileURLWithPath: #filePath)
-            .deletingLastPathComponent()
-            .deletingLastPathComponent()
-            .deletingLastPathComponent()
-            .appendingPathComponent("Rules", isDirectory: true)
+        let sourceRules = repositoryRoot.appendingPathComponent("Rules", isDirectory: true)
 
         let expectedFixtures = try relativeFiles(under: sourceRules.appendingPathComponent("fixtures"))
         let bundledFixtures = try relativeFiles(under: directory.appendingPathComponent("fixtures"))
@@ -178,29 +174,10 @@ struct GateConfigTests {
         return try #require(error).message
     }
 
-    private func withTemporaryDirectory<Result>(_ body: (URL) throws -> Result) throws -> Result {
-        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
-        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
-        defer { try? FileManager.default.removeItem(at: directory) }
-        return try body(directory)
-    }
-
     private func writeConfig(_ text: String, at path: String, in root: URL) throws -> URL {
         let url = root.appendingPathComponent(path)
         try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
         try Data(text.utf8).write(to: url)
         return url
-    }
-
-    private func relativeFiles(under directory: URL) throws -> Set<String> {
-        let enumerator = try #require(
-            FileManager.default.enumerator(at: directory, includingPropertiesForKeys: [.isRegularFileKey], options: [.skipsHiddenFiles])
-        )
-        let prefix = directory.standardizedFileURL.path + "/"
-        var files: Set<String> = []
-        for case let url as URL in enumerator where try url.resourceValues(forKeys: [.isRegularFileKey]).isRegularFile == true {
-            files.insert(String(url.standardizedFileURL.path.dropFirst(prefix.count)))
-        }
-        return files
     }
 }

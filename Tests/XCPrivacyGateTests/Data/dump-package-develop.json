@@ -1,151 +1,187 @@
 {
-  "cLanguageStandard": null,
-  "cxxLanguageStandard": null,
-  "defaultLocalization": null,
-  "dependencies": [],
-  "name": "Mindbox",
-  "packageKind": {
-    "root": [
+  "cLanguageStandard" : null,
+  "cxxLanguageStandard" : null,
+  "defaultLocalization" : null,
+  "dependencies" : [
+
+  ],
+  "name" : "Mindbox",
+  "packageKind" : {
+    "root" : [
       "/package"
     ]
   },
-  "pkgConfig": null,
-  "platforms": [
+  "pkgConfig" : null,
+  "platforms" : [
     {
-      "options": [],
-      "platformName": "ios",
-      "version": "12.0"
+      "options" : [
+
+      ],
+      "platformName" : "ios",
+      "version" : "12.0"
     }
   ],
-  "products": [
+  "products" : [
     {
-      "name": "Mindbox",
-      "settings": [],
-      "targets": [
+      "name" : "Mindbox",
+      "settings" : [
+
+      ],
+      "targets" : [
         "Mindbox"
       ],
-      "type": {
-        "library": [
+      "type" : {
+        "library" : [
           "automatic"
         ]
       }
     },
     {
-      "name": "MindboxNotificationsService",
-      "settings": [],
-      "targets": [
+      "name" : "MindboxNotificationsService",
+      "settings" : [
+
+      ],
+      "targets" : [
         "MindboxNotifications"
       ],
-      "type": {
-        "library": [
+      "type" : {
+        "library" : [
           "automatic"
         ]
       }
     },
     {
-      "name": "MindboxNotificationsContent",
-      "settings": [],
-      "targets": [
+      "name" : "MindboxNotificationsContent",
+      "settings" : [
+
+      ],
+      "targets" : [
         "MindboxNotifications"
       ],
-      "type": {
-        "library": [
+      "type" : {
+        "library" : [
           "automatic"
         ]
       }
     }
   ],
-  "providers": null,
-  "swiftLanguageVersions": null,
-  "targets": [
+  "providers" : null,
+  "swiftLanguageVersions" : null,
+  "targets" : [
     {
-      "dependencies": [
+      "dependencies" : [
         {
-          "byName": [
+          "byName" : [
             "SDKVersionProvider",
             null
           ]
         },
         {
-          "byName": [
+          "byName" : [
             "MindboxLogger",
             null
           ]
         }
       ],
-      "exclude": [
+      "exclude" : [
         "Info.plist"
       ],
-      "name": "Mindbox",
-      "packageAccess": false,
-      "path": "Mindbox",
-      "resources": [
+      "name" : "Mindbox",
+      "packageAccess" : false,
+      "path" : "Mindbox",
+      "resources" : [
         {
-          "path": "PrivacyInfo.xcprivacy",
-          "rule": {
-            "process": {}
+          "path" : "PrivacyInfo.xcprivacy",
+          "rule" : {
+            "process" : {
+
+            }
           }
         }
       ],
-      "settings": [],
-      "type": "regular"
+      "settings" : [
+
+      ],
+      "type" : "regular"
     },
     {
-      "dependencies": [
+      "dependencies" : [
         {
-          "byName": [
+          "byName" : [
             "SDKVersionProvider",
             null
           ]
         }
       ],
-      "exclude": [
+      "exclude" : [
         "Info.plist"
       ],
-      "name": "MindboxNotifications",
-      "packageAccess": false,
-      "path": "MindboxNotifications",
-      "resources": [
+      "name" : "MindboxNotifications",
+      "packageAccess" : false,
+      "path" : "MindboxNotifications",
+      "resources" : [
         {
-          "path": "PrivacyInfo.xcprivacy",
-          "rule": {
-            "process": {}
+          "path" : "PrivacyInfo.xcprivacy",
+          "rule" : {
+            "process" : {
+
+            }
           }
         }
       ],
-      "settings": [],
-      "type": "regular"
+      "settings" : [
+
+      ],
+      "type" : "regular"
     },
     {
-      "dependencies": [],
-      "exclude": [],
-      "name": "SDKVersionProvider",
-      "packageAccess": false,
-      "path": "SDKVersionProvider",
-      "resources": [],
-      "settings": [],
-      "type": "regular"
+      "dependencies" : [
+
+      ],
+      "exclude" : [
+
+      ],
+      "name" : "SDKVersionProvider",
+      "packageAccess" : false,
+      "path" : "SDKVersionProvider",
+      "resources" : [
+
+      ],
+      "settings" : [
+
+      ],
+      "type" : "regular"
     },
     {
-      "dependencies": [],
-      "exclude": [],
-      "name": "MindboxLogger",
-      "packageAccess": false,
-      "path": "MindboxLogger",
-      "resources": [
+      "dependencies" : [
+
+      ],
+      "exclude" : [
+
+      ],
+      "name" : "MindboxLogger",
+      "packageAccess" : false,
+      "path" : "MindboxLogger",
+      "resources" : [
         {
-          "path": "PrivacyInfo.xcprivacy",
-          "rule": {
-            "process": {}
+          "path" : "PrivacyInfo.xcprivacy",
+          "rule" : {
+            "process" : {
+
+            }
           }
         }
       ],
-      "settings": [],
-      "type": "regular"
+      "settings" : [
+
+      ],
+      "type" : "regular"
     }
   ],
-  "toolsVersion": {
-    "_version": "5.5.0"
+  "toolsVersion" : {
+    "_version" : "5.5.0"
   },
-  "traits": []
+  "traits" : [
+
+  ]
 }
