@@ -32,14 +32,14 @@ package struct Policy: Sendable {
         var violations = entryViolations(modules: modules) + overrideViolations(modules: modules, startOfToday: startOfToday)
         let liveOverrides = usage.overrides.filter { $0.expires >= startOfToday }
         for target in targets {
-            let use = ModuleUse(source: source[target.name], binary: binary[target.name])
+            let use = ModuleUse(source: source[target.name, default: .empty], binary: binary[target.name, default: .empty])
             guard target.manifest != nil else {
-                if !use.findings.isEmpty {
+                if !use.merged.findings.isEmpty {
                     violations.append(Violation(
                         code: "TARGET_WITHOUT_MANIFEST_USES_API",
                         module: target.name,
                         message: "\(target.name): the target has no \(ManifestValidator.fileName) but uses required-reason APIs: "
-                            + "\(calls(use.findings)). Add a manifest and list it in the target's resources in Package.swift"
+                            + "\(calls(use.merged.findings)). Add a manifest and list it in the target's resources in Package.swift"
                     ))
                 }
                 continue
@@ -54,17 +54,14 @@ package struct Policy: Sendable {
         }
     }
 
-    func category(of entry: UsageEntry) -> String? {
+    fileprivate func category(of entry: UsageEntry) -> String? {
         (rules.apis[entry.api]?.categories ?? []).pythonSorted().first { rules.categories[$0]?[entry.reason] != nil }
     }
 
     private func entryViolations(modules: Set<String>) -> [Violation] {
         usage.entries.flatMap { entry in
             let place = "usage.json call \(entry.module) \(entry.file) \(entry.api)"
-            var violations: [Violation] = []
-            if !modules.contains(entry.module) {
-                violations.append(Violation(code: "REGISTRY_UNKNOWN_MODULE", module: entry.module, message: "\(place): \(entry.module) is not a target in Package.swift"))
-            }
+            var violations = Self.unknownModule(entry.module, at: place, targets: modules)
             if category(of: entry) == nil {
                 let categories = (rules.apis[entry.api]?.categories ?? []).pythonSorted().joined(separator: ", ")
                 violations.append(Violation(code: "REGISTRY_UNKNOWN_REASON", module: entry.module, message: "\(place): \(entry.reason) is not an Apple reason of \(categories)"))
@@ -76,10 +73,7 @@ package struct Policy: Sendable {
     private func overrideViolations(modules: Set<String>, startOfToday: Date) -> [Violation] {
         usage.overrides.flatMap { override in
             let place = "usage.json override \(override.module) \(override.category)"
-            var violations: [Violation] = []
-            if !modules.contains(override.module) {
-                violations.append(Violation(code: "REGISTRY_UNKNOWN_MODULE", module: override.module, message: "\(place): \(override.module) is not a target in Package.swift"))
-            }
+            var violations = Self.unknownModule(override.module, at: place, targets: modules)
             let unknown = override.reasons.filter { rules.categories[override.category]?[$0] == nil }
             if !unknown.isEmpty {
                 violations.append(Violation(
@@ -99,25 +93,27 @@ package struct Policy: Sendable {
             return violations
         }
     }
+
+    private static func unknownModule(_ module: String, at place: String, targets modules: Set<String>) -> [Violation] {
+        modules.contains(module) ? [] : [Violation(code: "REGISTRY_UNKNOWN_MODULE", module: module, message: "\(place): \(module) is not a target in Package.swift")]
+    }
 }
 
 private struct ModuleUse {
     let source: [Finding]
     let binaryOnly: [Finding]
-    let usesStandardDefaults: Bool
-    let privateSuites: Set<String>
+    let merged: ModuleFindings
 
-    init(source: ModuleFindings?, binary: ModuleFindings?) {
-        let sourceFindings = source?.findings ?? []
-        let sourceAPIs = Set(sourceFindings.map(\.api))
-        self.source = sourceFindings
-        binaryOnly = (binary?.findings ?? []).filter { !sourceAPIs.contains($0.api) }
-        usesStandardDefaults = source?.usesStandardDefaults == true || binary?.usesStandardDefaults == true
-        privateSuites = (source?.privateSuites ?? []).union(binary?.privateSuites ?? [])
-    }
-
-    var findings: [Finding] {
-        source + binaryOnly
+    init(source: ModuleFindings, binary: ModuleFindings) {
+        let sourceAPIs = Set(source.findings.map(\.api))
+        let binaryOnly = ModuleFindings(
+            findings: binary.findings.filter { !sourceAPIs.contains($0.api) },
+            usesStandardDefaults: binary.usesStandardDefaults,
+            privateSuites: binary.privateSuites
+        )
+        self.source = source.findings
+        self.binaryOnly = binaryOnly.findings
+        merged = source.merging(binaryOnly)
     }
 }
 
@@ -145,10 +141,10 @@ private struct ModuleCheck {
         self.manifest = manifest
         self.policy = policy
         self.overrides = overrides
-        used = Self.byCategory(use.findings)
+        used = Self.byCategory(use.merged.findings)
         sourceUsed = Self.byCategory(use.source)
         entries = policy.usage.entries.filter { $0.module == name }.compactMap { entry in policy.category(of: entry).map { (entry: entry, category: $0) } }
-        standardOrPrivate = use.usesStandardDefaults || !use.privateSuites.isDisjoint(with: policy.usage.privateSuites)
+        standardOrPrivate = use.merged.usesStandardDefaults || !use.merged.privateSuites.isDisjoint(with: policy.usage.privateSuites)
     }
 
     mutating func run() -> [Violation] {

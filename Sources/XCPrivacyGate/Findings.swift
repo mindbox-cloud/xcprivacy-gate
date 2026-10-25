@@ -1,6 +1,6 @@
 import Foundation
 
-package struct Finding: Hashable, Sendable {
+package struct Finding: Sendable {
     package let api: String
     package let categories: Set<String>
     package let file: String?
@@ -25,5 +25,17 @@ package struct ModuleFindings: Sendable {
         self.findings = findings
         self.usesStandardDefaults = usesStandardDefaults
         self.privateSuites = privateSuites
+    }
+}
+
+extension ModuleFindings {
+    static let empty = ModuleFindings(findings: [], usesStandardDefaults: false, privateSuites: [])
+
+    func merging(_ other: ModuleFindings) -> ModuleFindings {
+        ModuleFindings(
+            findings: findings + other.findings,
+            usesStandardDefaults: usesStandardDefaults || other.usesStandardDefaults,
+            privateSuites: privateSuites.union(other.privateSuites)
+        )
     }
 }
