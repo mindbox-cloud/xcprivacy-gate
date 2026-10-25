@@ -18,7 +18,7 @@ package enum StringLiterals {
             var privateSuites: Set<String> = []
             for source in target.sources {
                 let file = Report.repositoryRelative(source.path, root: root)
-                for literal in try swiftLiterals(in: contents(of: source)) {
+                for literal in try swiftLiterals(in: contents(of: source), definesDebugInRelease: target.definesDebugInRelease) {
                     findings += apisByString[literal.value, default: []].map { rule in
                         Finding(api: rule.api, categories: Set(rule.categories), file: file, line: literal.line, evidence: "string literal")
                     }
@@ -32,9 +32,12 @@ package enum StringLiterals {
         return modules
     }
 
-    package static func swiftLiterals(in source: String) -> [(value: String, line: Int)] {
+    package static func swiftLiterals(in source: String, definesDebugInRelease: Bool) -> [(value: String, line: Int)] {
         let tree = Parser.parse(source: source)
-        let collector = LiteralCollector(converter: SourceLocationConverter(fileName: "", tree: tree))
+        let collector = LiteralCollector(
+            converter: SourceLocationConverter(fileName: "", tree: tree),
+            lanes: ShippedBuildLane.all(definesDebugInRelease: definesDebugInRelease)
+        )
         collector.walk(tree)
         return collector.literals
     }
@@ -50,10 +53,12 @@ package enum StringLiterals {
 
 private final class LiteralCollector: SyntaxVisitor {
     private let converter: SourceLocationConverter
+    private let lanes: [ShippedBuildLane]
     private(set) var literals: [(value: String, line: Int)] = []
 
-    init(converter: SourceLocationConverter) {
+    init(converter: SourceLocationConverter, lanes: [ShippedBuildLane]) {
         self.converter = converter
+        self.lanes = lanes
         super.init(viewMode: .sourceAccurate)
     }
 
@@ -65,7 +70,7 @@ private final class LiteralCollector: SyntaxVisitor {
     }
 
     override func visit(_ node: IfConfigDeclSyntax) -> SyntaxVisitorContinueKind {
-        let outcomes = ShippedBuildLane.all.map { node.activeClause(in: $0) }
+        let outcomes = lanes.map { node.activeClause(in: $0) }
         guard outcomes.allSatisfy({ $0.diagnostics.isEmpty }) else {
             return .visitChildren
         }

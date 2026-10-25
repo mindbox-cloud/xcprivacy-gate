@@ -2,10 +2,20 @@ import SwiftIfConfig
 import SwiftSyntax
 
 struct ShippedBuildLane: BuildConfiguration {
-    static let all: [ShippedBuildLane] = operatingSystems.flatMap { names in
-        versionExtremes.flatMap { language in
-            versionExtremes.flatMap { compiler in
-                [32, 64].map { ShippedBuildLane(operatingSystemNames: names, languageVersion: language, compilerVersion: compiler, targetPointerBitWidth: $0) }
+    static func all(definesDebugInRelease: Bool) -> [ShippedBuildLane] {
+        operatingSystems.flatMap { names in
+            versionExtremes.flatMap { language in
+                versionExtremes.flatMap { compiler in
+                    [32, 64].map {
+                        ShippedBuildLane(
+                            operatingSystemNames: names,
+                            languageVersion: language,
+                            compilerVersion: compiler,
+                            targetPointerBitWidth: $0,
+                            definesDebugInRelease: definesDebugInRelease
+                        )
+                    }
+                }
             }
         }
     }
@@ -20,11 +30,12 @@ struct ShippedBuildLane: BuildConfiguration {
     let languageVersion: VersionTuple
     let compilerVersion: VersionTuple
     let targetPointerBitWidth: Int
+    private let definesDebugInRelease: Bool
     var targetAtomicBitWidths: [Int] { [8, 16, 32, 64, 128] }
     var endianness: Endianness { .little }
 
     func isCustomConditionSet(name: String) throws -> Bool {
-        guard name == "DEBUG" else {
+        guard name == "DEBUG", !definesDebugInRelease else {
             throw UndecidedCondition()
         }
         return false

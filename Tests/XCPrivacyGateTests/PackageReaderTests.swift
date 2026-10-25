@@ -29,6 +29,7 @@ private struct DescribedResource: Encodable {
 }
 
 private let manifestTargets = ["Mindbox", "MindboxNotifications", "MindboxLogger"]
+private let emptyDump = Data(#"{"targets": []}"#.utf8)
 
 private func developPackage(root: URL) -> DescribedPackage {
     func target(_ name: String, sources: [String], manifest: Bool) -> DescribedTarget {
@@ -55,7 +56,7 @@ private func withDevelopTree<Result>(_ body: (URL) throws -> Result) throws -> R
 }
 
 private func readPackage(_ package: DescribedPackage) throws -> PackageDescription {
-    try PackageReader.read(description: JSONEncoder().encode(package))
+    try PackageReader.read(description: JSONEncoder().encode(package), dump: emptyDump)
 }
 
 private func codes(_ violations: [Violation]) -> [String] {
@@ -200,7 +201,7 @@ struct PackageReaderTests {
 
     @Test("output that is not describe's JSON is a tool error", arguments: ["not json", #"{"name": "Mindbox"}"#, "[]"])
     func unexpectedOutputIsToolError(output: String) {
-        let error = #expect(throws: ToolError.self) { try PackageReader.read(description: Data(output.utf8)) }
+        let error = #expect(throws: ToolError.self) { try PackageReader.read(description: Data(output.utf8), dump: emptyDump) }
 
         #expect(error?.message.hasPrefix("swift package describe printed unexpected output: ") == true)
     }
@@ -295,6 +296,6 @@ struct PackageReaderTests {
         }
         let link = directory.appendingPathComponent("link", isDirectory: true)
         try FileManager.default.createSymbolicLink(at: link, withDestinationURL: package)
-        return try PackageReader.read(description: PackageReader.describe(root: link))
+        return try PackageReader.read(description: PackageReader.describe(root: link), dump: PackageReader.dump(root: link))
     }
 }

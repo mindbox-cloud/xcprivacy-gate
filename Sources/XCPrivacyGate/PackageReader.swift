@@ -5,12 +5,14 @@ package struct PackageTarget: Equatable, Sendable {
     package let path: URL
     package let sources: [URL]
     package let manifest: URL?
+    package let definesDebugInRelease: Bool
 
-    package init(name: String, path: URL, sources: [URL], manifest: URL?) {
+    package init(name: String, path: URL, sources: [URL], manifest: URL?, definesDebugInRelease: Bool) {
         self.name = name
         self.path = path
         self.sources = sources
         self.manifest = manifest
+        self.definesDebugInRelease = definesDebugInRelease
     }
 }
 
@@ -27,8 +29,14 @@ package enum PackageReader {
         try Data(Toolchain.run(["swift", "package", "--package-path", root.path, "describe", "--type", "json"]).utf8)
     }
 
-    package static func read(description: Data) throws -> PackageDescription {
-        let package = try decode(description)
+    package static func dump(root: URL) throws -> Data {
+        try Data(Toolchain.run(["swift", "package", "--package-path", root.path, "dump-package"]).utf8)
+    }
+
+    package static func read(description: Data, dump: Data) throws -> PackageDescription {
+        let package = try decode(DescribedPackage.self, from: description, printedBy: "describe")
+        let dumped = try decode(DumpedPackage.self, from: dump, printedBy: "dump-package")
+        let releaseDebugTargets = Set(dumped.targets.filter(\.definesDebugInRelease).map(\.name))
         let root = URL(fileURLWithPath: package.path, isDirectory: true)
         var violations = package.dependencies.map { dependency in
             Violation(
@@ -41,7 +49,7 @@ package enum PackageReader {
         for target in package.targets {
             switch target.type {
             case "library":
-                targets.append(target.packageTarget(in: root, violations: &violations))
+                targets.append(target.packageTarget(in: root, definesDebugInRelease: releaseDebugTargets.contains(target.name), violations: &violations))
             case "binary":
                 violations.append(Violation(
                     code: "PACKAGE_DEPENDENCY",
@@ -64,11 +72,11 @@ package enum PackageReader {
         )
     }
 
-    private static func decode(_ description: Data) throws -> DescribedPackage {
+    private static func decode<Output: Decodable>(_ type: Output.Type, from output: Data, printedBy command: String) throws -> Output {
         do {
-            return try JSONDecoder().decode(DescribedPackage.self, from: description)
+            return try JSONDecoder().decode(type, from: output)
         } catch {
-            throw ToolError(message: "swift package describe printed unexpected output: \(StrictJSON.message(error, document: "the output"))")
+            throw ToolError(message: "swift package \(command) printed unexpected output: \(StrictJSON.message(error, document: "the output"))")
         }
     }
 }
@@ -102,8 +110,56 @@ private struct DescribedPackage: Decodable {
     }
 }
 
+private struct DumpedPackage: Decodable {
+    let targets: [Target]
+
+    struct Target: Decodable {
+        let name: String
+        let settings: [Setting]
+
+        var definesDebugInRelease: Bool {
+            settings.contains(where: \.definesDebugInRelease)
+        }
+    }
+
+    struct Setting: Decodable {
+        let tool: String
+        let kind: Kind
+        let condition: Condition?
+
+        private static let shippedPlatforms: Set = ["ios", "tvos", "watchos", "visionos"]
+
+        var definesDebugInRelease: Bool {
+            guard tool == "swift", kind.define?.name == "DEBUG" else {
+                return false
+            }
+            guard let condition else {
+                return true
+            }
+            return condition.config != "debug" && (condition.platformNames.isEmpty || !Self.shippedPlatforms.isDisjoint(with: condition.platformNames))
+        }
+    }
+
+    struct Kind: Decodable {
+        let define: Define?
+    }
+
+    struct Define: Decodable {
+        let name: String
+
+        enum CodingKeys: String, CodingKey {
+            case name = "_0"
+        }
+    }
+
+    struct Condition: Decodable {
+        let config: String?
+        let platformNames: [String]
+    }
+}
+
 private extension DescribedPackage.Target {
-    func packageTarget(in root: URL, violations: inout [Violation]) -> PackageTarget {
+    func packageTarget(in root: URL, definesDebugInRelease: Bool, violations: inout [Violation]) -> PackageTarget {
         let directory = root.appendingPathComponent(path, isDirectory: true).standardized
         let declared = resources?.first { URL(fileURLWithPath: $0.path, isDirectory: false).lastPathComponent == ManifestValidator.fileName }
         let unwired = directory.appendingPathComponent(ManifestValidator.fileName)
@@ -128,7 +184,8 @@ private extension DescribedPackage.Target {
             name: name,
             path: directory,
             sources: files.filter { $0.pathExtension == "swift" },
-            manifest: declared.map { URL(fileURLWithPath: $0.path, isDirectory: false) }
+            manifest: declared.map { URL(fileURLWithPath: $0.path, isDirectory: false) },
+            definesDebugInRelease: definesDebugInRelease
         )
     }
 }

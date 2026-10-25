@@ -23,7 +23,8 @@ private func target(_ name: String, manifest: Bool = true) -> PackageTarget {
         name: name,
         path: URL(fileURLWithPath: "/package/\(name)", isDirectory: true),
         sources: [],
-        manifest: manifest ? URL(fileURLWithPath: "/package/\(name)/PrivacyInfo.xcprivacy") : nil
+        manifest: manifest ? URL(fileURLWithPath: "/package/\(name)/PrivacyInfo.xcprivacy") : nil,
+        definesDebugInRelease: false
     )
 }
 

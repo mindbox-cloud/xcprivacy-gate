@@ -13,7 +13,7 @@ private struct Literal: Equatable {
 }
 
 private func literals(_ lines: String...) -> [Literal] {
-    StringLiterals.swiftLiterals(in: lines.joined(separator: "\n")).map { Literal(value: $0.value, line: $0.line) }
+    StringLiterals.swiftLiterals(in: lines.joined(separator: "\n"), definesDebugInRelease: false).map { Literal(value: $0.value, line: $0.line) }
 }
 
 private let ifBranch = Literal(value: "NSFileCreationDate", line: 2)
@@ -244,7 +244,7 @@ struct StringLiteralsTests {
     func unreadableSourceIsToolError() throws {
         try withTemporaryDirectory { root in
             let missing = root.appending(path: "Core/Missing.swift")
-            let target = PackageTarget(name: "Core", path: root.appending(path: "Core"), sources: [missing], manifest: nil)
+            let target = PackageTarget(name: "Core", path: root.appending(path: "Core"), sources: [missing], manifest: nil, definesDebugInRelease: false)
 
             let error = #expect(throws: ToolError.self) { try StringLiterals.findings(targets: [target], rules: rules, usage: usage, root: root) }
             let message = try #require(error).message
@@ -265,7 +265,7 @@ struct StringLiteralsTests {
                 try Data(lines.joined(separator: "\n").utf8).write(to: file)
                 sources[String(path.prefix { $0 != "/" }), default: []].append(file)
             }
-            let targets = sources.map { PackageTarget(name: $0.key, path: root.appending(path: $0.key), sources: $0.value, manifest: nil) }
+            let targets = sources.map { PackageTarget(name: $0.key, path: root.appending(path: $0.key), sources: $0.value, manifest: nil, definesDebugInRelease: false) }
             return try StringLiterals.findings(targets: targets, rules: rules, usage: usage, root: root)
         }
     }
