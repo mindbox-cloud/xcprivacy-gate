@@ -22,6 +22,8 @@ package enum Toolchain {
         let errors = Pipe()
         process.standardOutput = output
         process.standardError = errors
+        let exited = DispatchSemaphore(value: 0)
+        process.terminationHandler = { _ in exited.signal() }
         do {
             try process.run()
         } catch {
@@ -38,7 +40,7 @@ package enum Toolchain {
         }.start()
         let outputRead = Result { try output.fileHandleForReading.readToEnd() }
         drained.wait()
-        process.waitUntilExit()
+        exited.wait()
         let outputData: Data
         let errorData: Data
         do {
