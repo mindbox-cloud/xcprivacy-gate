@@ -258,15 +258,30 @@ struct ManifestValidatorTests {
         #expect(try codes("NSPrivacyTracking = false") == ["MANIFEST_UNREADABLE"])
     }
 
-    @Test("a CDATA section counts as string text")
-    func cdataSectionCountsAsStringText() throws {
-        #expect(try codes(manifestXML(apiTypes: "<array>\(apiEntry(reasons: ["<![CDATA[CA92.1]]>"]))</array>")) == [])
+    @Test("CDATA sections count as key and string text")
+    func cdataSectionsCountAsKeyAndStringText() throws {
+        let xml = manifestXML(apiTypes: "<array>\(apiEntry(reasons: ["<![CDATA[CA92.1]]>"]))</array>")
+            .replacing("<key>NSPrivacyTracking</key>", with: "<key><![CDATA[NSPrivacyTracking]]></key>")
+            .replacing("<key>NSPrivacyTrackingDomains</key>", with: "<key><![CDATA[NSPrivacyTrackingDomains]]></key>")
+
+        #expect(try codes(xml) == [])
+    }
+
+    @Test("a key inside an array is unreadable")
+    func keyInsideArrayIsUnreadable() throws {
+        #expect(try codes(manifestXML().replacing("<string>CA92.1</string>", with: "<key>CA92.1</key>")) == ["MANIFEST_UNREADABLE"])
+    }
+
+    @Test("text after the root dictionary is unreadable")
+    func textAfterRootDictionaryIsUnreadable() throws {
+        #expect(try codes(manifestXML().replacing("</dict></plist>", with: "</dict>stray</plist>")) == ["MANIFEST_UNREADABLE"])
     }
 
     @Test("an XML entity declaration makes the manifest unreadable", arguments: [
         "<!ENTITY unused \"CA92.1\">",
         "<!ENTITY % unused \"CA92.1\">",
-        "<!NOTATION gif SYSTEM \"image/gif\"><!ENTITY unused SYSTEM \"unused.gif\" NDATA gif>"
+        "<!NOTATION gif SYSTEM \"image/gif\"><!ENTITY unused SYSTEM \"unused.gif\" NDATA gif>",
+        "<!ENTITY unused SYSTEM \"unused.xml\">"
     ])
     func entityDeclarationMakesManifestUnreadable(declaration: String) throws {
         let xml = manifestXML().replacing(
