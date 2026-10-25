@@ -16,6 +16,13 @@ private func literals(_ lines: String...) -> [Literal] {
     StringLiterals.swiftLiterals(in: lines.joined(separator: "\n")).map { Literal(value: $0.value, line: $0.line) }
 }
 
+private let ifBranch = Literal(value: "NSFileCreationDate", line: 2)
+private let elseBranch = Literal(value: "NSFileSystemSize", line: 4)
+
+private func branchLiterals(_ condition: String) -> [Literal] {
+    literals("#if \(condition)", #"let a = "NSFileCreationDate""#, "#else", #"let b = "NSFileSystemSize""#, "#endif")
+}
+
 private func calls(_ module: ModuleFindings) -> [String] {
     module.findings.map { "\($0.api) \($0.file ?? "") \($0.line ?? 0)" }
 }
@@ -118,6 +125,75 @@ struct StringLiteralsTests {
             #"    "free: \(attributes[FileAttributeKey(rawValue: "NSFileSystemFreeSize")] ?? 0)""#,
             ")"
         ) == [Literal(value: "NSFileSystemFreeSize", line: 2)])
+    }
+
+    @Test(
+        "a clause no shipped build compiles is skipped and its #else counts",
+        arguments: [
+            "os(macOS)", "os(Linux)", "targetEnvironment(simulator)", "targetEnvironment(macCatalyst)", "DEBUG",
+            "_runtime(_Native)", "objectFormat(ELF)", "_endian(big)", "!_hasAtomicBitWidth(_128)"
+        ]
+    )
+    func unshippedClauseIsSkipped(condition: String) {
+        #expect(branchLiterals(condition) == [elseBranch])
+    }
+
+    @Test(
+        "a condition that differs between shipped builds keeps both branches",
+        arguments: [
+            "os(iOS)", "os(tvOS)", "os(watchOS)", "os(visionOS)", "os(xrOS)",
+            "swift(>=5.9)", "compiler(>=6.0)", "swift(<6) && compiler(>=6)", "_pointerBitWidth(_32)"
+        ]
+    )
+    func laneDependentConditionKeepsBothBranches(condition: String) {
+        #expect(branchLiterals(condition) == [ifBranch, elseBranch])
+    }
+
+    @Test(
+        "a condition no shipped build can decide keeps every clause",
+        arguments: [
+            "SWIFT_PACKAGE", "canImport(UIKit)", "arch(arm64)", "os(macOS) || canImport(X)",
+            "_ptrauth(arm64e)", "hasFeature(StrictConcurrency)", "hasAttribute(retroactive)"
+        ]
+    )
+    func undecidableConditionKeepsEveryClause(condition: String) {
+        #expect(branchLiterals(condition) == [ifBranch, elseBranch])
+    }
+
+    @Test("an #elseif chain keeps the clauses some shipped build reaches")
+    func elseIfChainKeepsReachedClauses() {
+        #expect(literals(
+            "#if os(tvOS)",
+            #"let a = "NSFileCreationDate""#,
+            "#elseif os(macOS)",
+            #"let b = "NSFileSystemSize""#,
+            "#elseif os(watchOS)",
+            #"let c = "NSFileSystemFreeSize""#,
+            "#else",
+            #"let d = "NSUserDefaults""#,
+            "#endif"
+        ) == [
+            Literal(value: "NSFileCreationDate", line: 2),
+            Literal(value: "NSFileSystemFreeSize", line: 6),
+            Literal(value: "NSUserDefaults", line: 8)
+        ])
+    }
+
+    @Test("a nested #if os(iOS) inside #if os(macOS) is skipped, and so is os(macOS) inside os(iOS)")
+    func nestedClausesAreSkipped() {
+        #expect(literals(
+            "#if os(macOS)",
+            "#if os(iOS)",
+            #"let a = "NSFileCreationDate""#,
+            "#endif",
+            "#endif",
+            "#if os(iOS)",
+            "#if os(macOS)",
+            #"let b = "NSFileSystemSize""#,
+            "#endif",
+            #"let c = "NSUserDefaults""#,
+            "#endif"
+        ) == [Literal(value: "NSUserDefaults", line: 10)])
     }
 
     @Test("FileAttributeKey(rawValue: \"NSFileSystemFreeSize\") is systemFreeSize")
