@@ -62,6 +62,9 @@ private final class LiteralCollector: SyntaxVisitor {
     }
 
     override func visit(_ node: IfConfigDeclSyntax) -> SyntaxVisitorContinueKind {
+        guard !VersionCheckFinder.checksVersion(node) else {
+            return .visitChildren
+        }
         let outcomes = lanes.map { node.activeClause(in: $0) }
         guard outcomes.allSatisfy({ $0.diagnostics.isEmpty }) else {
             return .visitChildren
@@ -73,5 +76,26 @@ private final class LiteralCollector: SyntaxVisitor {
             }
         }
         return .skipChildren
+    }
+}
+
+private final class VersionCheckFinder: SyntaxVisitor {
+    private static let versionChecks: Set = ["swift", "compiler", "_compiler_version"]
+
+    private var found = false
+
+    static func checksVersion(_ node: IfConfigDeclSyntax) -> Bool {
+        let finder = VersionCheckFinder(viewMode: .sourceAccurate)
+        for condition in node.clauses.compactMap(\.condition) {
+            finder.walk(condition)
+        }
+        return finder.found
+    }
+
+    override func visit(_ node: FunctionCallExprSyntax) -> SyntaxVisitorContinueKind {
+        if let callee = node.calledExpression.as(DeclReferenceExprSyntax.self), Self.versionChecks.contains(callee.baseName.text) {
+            found = true
+        }
+        return .visitChildren
     }
 }

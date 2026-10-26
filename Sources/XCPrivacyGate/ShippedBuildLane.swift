@@ -4,33 +4,21 @@ import SwiftSyntax
 struct ShippedBuildLane: BuildConfiguration {
     static func all(definesDebugInRelease: Bool) -> [ShippedBuildLane] {
         operatingSystems.flatMap { names in
-            versionExtremes.flatMap { language in
-                versionExtremes.flatMap { compiler in
-                    [32, 64].map {
-                        ShippedBuildLane(
-                            operatingSystemNames: names,
-                            languageVersion: language,
-                            compilerVersion: compiler,
-                            targetPointerBitWidth: $0,
-                            definesDebugInRelease: definesDebugInRelease
-                        )
-                    }
-                }
-            }
+            [32, 64].map { ShippedBuildLane(operatingSystemNames: names, targetPointerBitWidth: $0, definesDebugInRelease: definesDebugInRelease) }
         }
     }
 
     private static let operatingSystems: [Set<String>] = [["iOS"], ["tvOS"], ["watchOS"], ["visionOS", "xrOS"]]
-    private static let versionExtremes = [VersionTuple(0), VersionTuple(Int.max)]
+    private static let swiftVersion = VersionTuple(6, 3)
     private static let environments = ["simulator": false, "macCatalyst": false]
     private static let runtimes = ["_ObjC": true, "_multithreaded": true, "_Native": false]
     private static let objectFormats = ["MachO": true, "ELF": false, "COFF": false, "Wasm": false]
 
     private let operatingSystemNames: Set<String>
-    let languageVersion: VersionTuple
-    let compilerVersion: VersionTuple
     let targetPointerBitWidth: Int
     private let definesDebugInRelease: Bool
+    var languageVersion: VersionTuple { Self.swiftVersion }
+    var compilerVersion: VersionTuple { Self.swiftVersion }
     var targetAtomicBitWidths: [Int] { [8, 16, 32, 64, 128] }
     var endianness: Endianness { .little }
 
