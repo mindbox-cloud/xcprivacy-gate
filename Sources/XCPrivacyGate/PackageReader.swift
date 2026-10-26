@@ -1,6 +1,6 @@
 import Foundation
 
-package struct PackageTarget: Equatable, Sendable {
+package struct PackageTarget: Sendable {
     package let name: String
     package let sources: [URL]
     package let manifest: URL?

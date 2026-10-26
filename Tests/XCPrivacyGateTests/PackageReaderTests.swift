@@ -70,7 +70,7 @@ struct PackageReaderTests {
 
             #expect(description.name == "Sample")
             #expect(description.root.path == root.path)
-            #expect(description.violations == [])
+            #expect(description.violations.isEmpty)
             let targets = Dictionary(uniqueKeysWithValues: description.targets.map { ($0.name, $0) })
             #expect(Set(targets.keys) == ["Core", "Notifications", "SDKVersionProvider", "Logger"])
             let core = try #require(targets["Core"])
@@ -156,7 +156,7 @@ struct PackageReaderTests {
             let description = try readPackage(package)
 
             #expect(!description.targets.contains { $0.name == "CoreTests" })
-            #expect(description.violations == [])
+            #expect(description.violations.isEmpty)
         }
     }
 
@@ -240,7 +240,7 @@ struct PackageReaderTests {
             )
 
             #expect(description.targets.first?.sources.map(\.lastPathComponent) == ["A.swift"])
-            #expect(description.violations == [])
+            #expect(description.violations.isEmpty)
         }
     }
 
@@ -252,7 +252,7 @@ struct PackageReaderTests {
 
             let swifty = try #require(description.targets.first)
             #expect(swifty.manifest == nil)
-            #expect(description.violations == [])
+            #expect(description.violations.isEmpty)
         }
     }
 

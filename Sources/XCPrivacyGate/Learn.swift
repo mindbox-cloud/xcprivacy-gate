@@ -1,6 +1,6 @@
 import Foundation
 
-package struct LearnedNames: Equatable, Sendable {
+package struct LearnedNames: Sendable {
     package var usrs: [String]
     package var symbols: [String]
     package var selectors: [String]

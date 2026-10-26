@@ -50,7 +50,7 @@ struct ManifestValidatorTests {
 
         let (manifest, violations) = try check(xml)
 
-        #expect(violations == [])
+        #expect(violations.isEmpty)
         let parsed = try #require(manifest)
         #expect(parsed.apiTypes == ["NSPrivacyAccessedAPICategoryUserDefaults": ["CA92.1"]])
     }
@@ -106,7 +106,7 @@ struct ManifestValidatorTests {
     func missingApiTypesAreAllowed() throws {
         let (manifest, violations) = try check(manifestXML(apiTypes: nil))
 
-        #expect(violations == [])
+        #expect(violations.isEmpty)
         #expect(try #require(manifest).apiTypes == [:])
     }
 
@@ -136,7 +136,7 @@ struct ManifestValidatorTests {
     func missingTrackingIsAllowedWhenTrackingDisabledIsOff() throws {
         let (manifest, violations) = try check(manifestXML(tracking: nil), trackingDisabled: false)
 
-        #expect(violations == [])
+        #expect(violations.isEmpty)
         #expect(manifest != nil)
     }
 
@@ -221,7 +221,7 @@ struct ManifestValidatorTests {
 
         let (manifest, violations) = try check(xml, trackingDisabled: false)
 
-        #expect(violations == [])
+        #expect(violations.isEmpty)
         #expect(manifest != nil)
     }
 
@@ -260,7 +260,7 @@ struct ManifestValidatorTests {
 
         let (manifest, violations) = try check(binary)
 
-        #expect(violations == [])
+        #expect(violations.isEmpty)
         #expect(try #require(manifest).apiTypes == ["NSPrivacyAccessedAPICategoryUserDefaults": ["CA92.1"]])
     }
 

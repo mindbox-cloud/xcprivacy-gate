@@ -1,6 +1,6 @@
 import Foundation
 
-package struct GateConfig: Equatable, Sendable {
+package struct GateConfig: Sendable {
     package let usage: URL
     package let packagePath: URL
     package let repositoryRoot: URL

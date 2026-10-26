@@ -1,6 +1,6 @@
 import Foundation
 
-package struct AppleSDKListing: Equatable, Sendable, Decodable {
+package struct AppleSDKListing: Sendable, Decodable {
     package let name: String
     package let listed: Bool
 

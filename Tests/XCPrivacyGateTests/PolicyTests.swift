@@ -123,7 +123,7 @@ struct PolicyTests {
 
         #expect(codes(evaluate(found, declares: [bootTime: ["35F9.1", "8FFB.1"]], registry: registered)) == ["REASONS_MISMATCH"])
         #expect(codes(evaluate(found, declares: [bootTime: ["8FFB.1"]], registry: registered)) == ["REASONS_MISMATCH"])
-        #expect(evaluate(found, declares: [bootTime: ["35F9.1"]], registry: registered) == [])
+        #expect(evaluate(found, declares: [bootTime: ["35F9.1"]], registry: registered).isEmpty)
     }
 
     @Test("an entry with a reason of another category is REGISTRY_UNKNOWN_REASON")
@@ -155,7 +155,7 @@ struct PolicyTests {
         let found = uses(compiled("mach_absolute_time", [bootTime]))
         let registered = registry(entry("mach_absolute_time", "35F9.1"))
 
-        #expect(evaluate(uses(), binary: found, declares: [bootTime: ["35F9.1"]], registry: registered) == [])
+        #expect(evaluate(uses(), binary: found, declares: [bootTime: ["35F9.1"]], registry: registered).isEmpty)
         #expect(codes(evaluate(uses(), binary: found, declares: [bootTime: ["8FFB.1"]], registry: registered)) == ["REASONS_MISMATCH"])
     }
 
@@ -181,7 +181,7 @@ struct PolicyTests {
             registry: registry(overrides: [override])
         )
 
-        #expect(violations == [])
+        #expect(violations.isEmpty)
     }
 
     @Test("two binary findings of one API report one BINARY_ONLY_API")
@@ -196,7 +196,7 @@ struct PolicyTests {
 
     @Test("binary-only UserDefaults follows the App Group policy, not the registry")
     func binaryOnlyUserDefaultsFollowsAppGroupPolicy() {
-        #expect(evaluate(uses(), binary: uses(compiled("UserDefaults", [userDefaults])), declares: [userDefaults: ["1C8F.1"]]) == [])
+        #expect(evaluate(uses(), binary: uses(compiled("UserDefaults", [userDefaults])), declares: [userDefaults: ["1C8F.1"]]).isEmpty)
     }
 
     @Test("the same API in source and binary reports once")
@@ -277,7 +277,7 @@ struct PolicyTests {
 
     @Test("UserDefaults in the App Group suite with 1C8F.1 is clean")
     func appGroupOnlyIsClean() {
-        #expect(evaluate(uses(finding("UserDefaults", [userDefaults])), declares: [userDefaults: ["1C8F.1"]]) == [])
+        #expect(evaluate(uses(finding("UserDefaults", [userDefaults])), declares: [userDefaults: ["1C8F.1"]]).isEmpty)
     }
 
     @Test("CA92.1 without standard defaults or a private suite is UD_CA92_UNUSED")
@@ -299,7 +299,7 @@ struct PolicyTests {
         let found = uses(finding("UserDefaults", [userDefaults]))
         let registered = registry(entry("UserDefaults", "CA92.1"))
 
-        #expect(evaluate(found, declares: [userDefaults: ["CA92.1"]], registry: registered, userDefaultsAppGroup: false) == [])
+        #expect(evaluate(found, declares: [userDefaults: ["CA92.1"]], registry: registered, userDefaultsAppGroup: false).isEmpty)
         #expect(codes(evaluate(found, declares: [userDefaults: ["1C8F.1"]], registry: registered, userDefaultsAppGroup: false)) == ["REASONS_MISMATCH"])
         #expect(codes(evaluate(found, declares: [userDefaults: ["CA92.1"]], userDefaultsAppGroup: false)) == ["UNREGISTERED_CALL"])
     }
@@ -320,7 +320,7 @@ struct PolicyTests {
     func liveOverrideAllowsCategoryWithoutCall() throws {
         let override = Override(module: "Core", category: bootTime, reasons: ["35F9.1"], evidence: evidenceURL, expires: try day("2026-12-31"))
 
-        #expect(evaluate(uses(), declares: [bootTime: ["35F9.1"]], registry: registry(overrides: [override])) == [])
+        #expect(evaluate(uses(), declares: [bootTime: ["35F9.1"]], registry: registry(overrides: [override])).isEmpty)
     }
 
     @Test("an override stays live until its expiry day ends")
@@ -334,7 +334,7 @@ struct PolicyTests {
             manifests: ["Core": manifest([bootTime: ["35F9.1"]])]
         )
 
-        #expect(violations == [])
+        #expect(violations.isEmpty)
     }
 
     @Test("an expired override is reported and no longer allows the category")
@@ -358,7 +358,7 @@ struct PolicyTests {
                 rules: rules,
                 trackingDisabled: true
             )
-            #expect(violations == [])
+            #expect(violations.isEmpty)
             let manifest = try #require(parsed)
             manifests[name] = manifest
         }

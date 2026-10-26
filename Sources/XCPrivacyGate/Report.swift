@@ -1,6 +1,6 @@
 import Foundation
 
-package struct Violation: Equatable, Sendable {
+package struct Violation: Sendable {
     package let code: String
     package let module: String?
     package let message: String

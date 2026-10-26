@@ -50,12 +50,12 @@ extension Trait where Self == CompiledFixtures {
 struct SelfTestTests {
     @Test("every API in the committed rules has usrs, binary names and its Swift fixtures")
     func everyApiHasFixtureAndNames() throws {
-        #expect(try SelfTest.incomplete(rules: committedRules(), rulesDirectory: RulesBundle.directory) == [])
+        #expect(try SelfTest.incomplete(rules: committedRules(), rulesDirectory: RulesBundle.directory).isEmpty)
     }
 
     @Test("the committed rules pass the self-test")
     func committedRulesPassSelfTest() throws {
-        #expect(try SelfTest.run(rules: committedRules(), rulesDirectory: RulesBundle.directory) == [])
+        #expect(try SelfTest.run(rules: committedRules(), rulesDirectory: RulesBundle.directory).isEmpty)
     }
 
     @Test("a rule without binary names is incomplete")
