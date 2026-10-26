@@ -216,7 +216,8 @@ struct RefreshTests {
         #expect(!result.changed)
         #expect(result.body.isEmpty)
         #expect(try snapshot(directory) == before)
-        #expect(site.requests.compactMap(\.url?.absoluteString).sorted() == ApplePage.allCases.map(\.address).sorted())
+        let fetched: [ApplePage] = [.requiredReasons, .dataTypes, .purposes, .tn3181, .sdkList]
+        #expect(site.requests.compactMap(\.url?.absoluteString).sorted() == fetched.map(\.address).sorted())
         #expect(site.requests.allSatisfy { $0.value(forHTTPHeaderField: "User-Agent") == "xcprivacy-gate/\(ToolVersion.current)" })
     }
 

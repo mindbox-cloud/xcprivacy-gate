@@ -5,7 +5,7 @@ package struct RefreshResult: Sendable {
     package let body: String
 }
 
-package enum ApplePage: CaseIterable, Sendable {
+package enum ApplePage: Sendable {
     case requiredReasons
     case dataTypes
     case purposes
