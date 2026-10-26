@@ -29,7 +29,7 @@ private func target(_ name: String, manifest: Bool = true) -> PackageTarget {
 }
 
 private func manifest(_ apiTypes: [String: [String]]) -> Manifest {
-    Manifest(path: URL(fileURLWithPath: "/package/Core/PrivacyInfo.xcprivacy"), tracking: false, domains: [], apiTypes: apiTypes)
+    Manifest(path: URL(fileURLWithPath: "/package/Core/PrivacyInfo.xcprivacy"), apiTypes: apiTypes)
 }
 
 private func finding(_ api: String, _ categories: Set<String>, file: String = "Core/Foo.swift", line: Int = 1, evidence: String? = nil) -> Finding {

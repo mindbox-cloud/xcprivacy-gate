@@ -2,14 +2,10 @@ import Foundation
 
 package struct Manifest: Sendable {
     package let path: URL
-    package let tracking: Bool
-    package let domains: [String]
     package let apiTypes: [String: [String]]
 
-    package init(path: URL, tracking: Bool, domains: [String], apiTypes: [String: [String]]) {
+    package init(path: URL, apiTypes: [String: [String]]) {
         self.path = path
-        self.tracking = tracking
-        self.domains = domains
         self.apiTypes = apiTypes
     }
 }
@@ -49,14 +45,13 @@ private struct ManifestCheck {
 
     mutating func run() -> Manifest? {
         guard let content = read() else { return nil }
-        let tracking = tracking(content)
-        let domains = domains(content, tracking: tracking)
+        checkDomains(content, tracking: tracking(content))
         checkCollected(content)
         let apiTypes = apiTypes(content)
         for key in content.keys.filter({ !Key.topLevel.contains($0) }).pythonSorted() {
             report("MANIFEST_UNKNOWN_KEY", "unknown top-level key \(key.pythonRepr)")
         }
-        return Manifest(path: url, tracking: tracking, domains: domains, apiTypes: apiTypes)
+        return Manifest(path: url, apiTypes: apiTypes)
     }
 
     private mutating func report(_ code: String, _ message: String) {
@@ -119,11 +114,11 @@ private struct ManifestCheck {
         return tracking
     }
 
-    private mutating func domains(_ content: [String: PlistValue], tracking: Bool) -> [String] {
+    private mutating func checkDomains(_ content: [String: PlistValue], tracking: Bool) {
         let value = content[Key.domains] ?? .array([])
         guard let domains = value.nonEmptyStrings else {
             report("MANIFEST_TYPE", "\(Key.domains) must be an array of non-empty strings, found \(value.pythonRepr)")
-            return []
+            return
         }
         if tracking && domains.isEmpty {
             report("TRACKING_DOMAINS", "\(Key.domains) lists no domain while \(Key.tracking) is true (TN3181)")
@@ -135,7 +130,6 @@ private struct ManifestCheck {
                 report("TRACKING_DOMAINS", "tracking domain \(domain.pythonRepr) must be a bare host name")
             }
         }
-        return domains
     }
 
     private mutating func checkCollected(_ content: [String: PlistValue]) {
