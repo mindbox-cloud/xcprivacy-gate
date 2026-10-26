@@ -62,6 +62,49 @@ struct GateConfigTests {
         }
     }
 
+    @Test("a config outside .github, in a subdirectory of a checkout, has the checkout as repository root and package")
+    func configInCheckoutSubdirectory() throws {
+        try withTemporaryDirectory { temporary in
+            let checkout = try canonical(temporary).appendingPathComponent("checkout", isDirectory: true)
+            try makeGitDirectory(in: checkout)
+            let url = try writeConfig(configText(setting: "packagePath", to: nil), at: "ci/privacy/config.json", in: checkout)
+
+            let config = try GateConfig.load(url)
+
+            #expect(config.repositoryRoot.path == checkout.path)
+            #expect(config.packagePath.path == checkout.path)
+        }
+    }
+
+    @Test("a .git file, as in a worktree or submodule, marks the nearest checkout")
+    func gitFileMarksCheckout() throws {
+        try withTemporaryDirectory { temporary in
+            let outer = try canonical(temporary).appendingPathComponent("outer", isDirectory: true)
+            let inner = outer.appendingPathComponent("inner", isDirectory: true)
+            try makeGitDirectory(in: outer)
+            try FileManager.default.createDirectory(at: inner, withIntermediateDirectories: true)
+            try Data("gitdir: ../.git/modules/inner\n".utf8).write(to: inner.appendingPathComponent(".git"))
+            let url = try writeConfig(configText(setting: "packagePath", to: nil), at: "tools/.github/config.json", in: inner)
+
+            let config = try GateConfig.load(url)
+
+            #expect(config.repositoryRoot.path == inner.path)
+            #expect(config.packagePath.path == inner.path)
+        }
+    }
+
+    @Test("a config outside any git checkout is a tool error naming it")
+    func configOutsideCheckoutIsAnError() throws {
+        try withTemporaryDirectory { temporary in
+            let url = try writeConfig(validConfig, at: "repository/.github/config.json", in: canonical(temporary))
+
+            let message = try loadErrorMessage(url)
+
+            #expect(message.contains("/repository/.github/config.json: "))
+            #expect(message.contains("must live inside a git checkout"))
+        }
+    }
+
     @Test("a missing policy key is a tool error naming it", arguments: ["policy.userDefaultsAppGroup", "policy.trackingDisabled"])
     func missingPolicyKeyIsAnError(key: String) throws {
         try withTemporaryDirectory { root in

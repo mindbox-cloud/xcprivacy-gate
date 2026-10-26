@@ -137,6 +137,24 @@ struct GateTests {
         #expect(try text(result.standardOutputContent) == "::error title=privacy manifest tool error::Unknown option '--lanes'\n")
     }
 
+    @Test("the bare command without a subcommand exits 2 and says a subcommand is required")
+    func bareCommandExitsTwo() async throws {
+        let result = try await #require(processExitsWith: .exitCode(2), observing: [\.standardErrorContent]) {
+            runCommand([], stepSummary: nil)
+        }
+
+        #expect(try text(result.standardErrorContent).hasPrefix("Error: a subcommand is required\n"))
+    }
+
+    @Test("--help exits 0 with the overview")
+    func helpExitsZero() async throws {
+        let result = try await #require(processExitsWith: .success, observing: [\.standardOutputContent]) {
+            runCommand(["--help"], stepSummary: nil)
+        }
+
+        #expect(try text(result.standardOutputContent).hasPrefix("OVERVIEW: "))
+    }
+
     @Test("a package with an Objective-C target fails with UNSCANNABLE_SOURCE, and package and manifest violations come before the policy ones")
     func objectiveCTargetIsUnscannable() throws {
         try withTemporaryDirectory { root in
