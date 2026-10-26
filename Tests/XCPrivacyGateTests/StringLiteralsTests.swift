@@ -240,6 +240,29 @@ struct StringLiteralsTests {
         ) == [Literal(value: "NSUserDefaults", line: 10)])
     }
 
+    @Test("a nested #if os(tvOS) inside #if os(iOS) is skipped, because no build compiles both")
+    func mutuallyExclusiveNestingIsSkipped() {
+        #expect(literals(
+            "#if os(iOS)",
+            "#if os(tvOS)",
+            #"let a = "NSFileCreationDate""#,
+            "#endif",
+            #"let b = "NSUserDefaults""#,
+            "#endif"
+        ) == [Literal(value: "NSUserDefaults", line: 5)])
+    }
+
+    @Test("a nested #if os(tvOS) inside #if os(iOS) || os(tvOS) counts, because the tvOS build compiles both")
+    func overlappingNestingCounts() {
+        #expect(literals(
+            "#if os(iOS) || os(tvOS)",
+            "#if os(tvOS)",
+            #"let a = "NSFileCreationDate""#,
+            "#endif",
+            "#endif"
+        ) == [Literal(value: "NSFileCreationDate", line: 3)])
+    }
+
     @Test("FileAttributeKey(rawValue: \"NSFileSystemFreeSize\") is systemFreeSize")
     func rawValueKeyIsSystemFreeSize() throws {
         let core = try scan([loader: ["import Foundation", "", #"let key = FileAttributeKey(rawValue: "NSFileSystemFreeSize")"#]], target: "Core")
