@@ -5,10 +5,19 @@ private let branch = "bot/apple-privacy-rules"
 private let title = "feat: refresh Apple privacy rules"
 private let script = repositoryRoot.appending(path: "scripts/rules-pr.sh")
 
+private let ownPullRequest = #"[{"number": 7, "isCrossRepository": false}]"#
+
 private let fakeGh = """
     #!/bin/sh
     echo "$*" >> "$GH_LOG"
-    if [ "$1 $2" = "pr list" ]; then echo "$GH_OPEN_PRS"; fi
+    if [ "$1 $2" = "pr list" ]; then
+      filter=.
+      while [ $# -gt 0 ]; do
+        if [ "$1" = --jq ]; then filter=$2; fi
+        shift
+      done
+      printf '%s' "$GH_OPEN_PRS" | jq -r "$filter"
+    fi
 
     """
 
@@ -111,12 +120,12 @@ private struct RulesPullRequestRepository {
         try git(["push", "--quiet", "origin", branch], in: work)
     }
 
-    func runScript(line: String?, openPullRequests: Int) throws {
+    func runScript(line: String?, openPullRequests: String) throws {
         let checkout = try clone("checkout-\(UUID().uuidString)")
         try run(
             ["bash", script.path, directory.appending(path: "bin/xcprivacy-gate").path],
             in: checkout,
-            adding: ["RULES_LINE": line ?? "", "GH_OPEN_PRS": String(openPullRequests)]
+            adding: ["RULES_LINE": line ?? "", "GH_OPEN_PRS": openPullRequests]
         )
     }
 
@@ -146,7 +155,7 @@ struct RulesPullRequestTests {
         let repository = try RulesPullRequestRepository()
         defer { repository.remove() }
 
-        try repository.runScript(line: "v2", openPullRequests: 0)
+        try repository.runScript(line: "v2", openPullRequests: "[]")
 
         #expect(try repository.subjects(branch) == [title, "Main"])
         #expect(try repository.remoteRules(branch) == "v1\nv2\n")
@@ -161,7 +170,7 @@ struct RulesPullRequestTests {
         let repository = try RulesPullRequestRepository()
         defer { repository.remove() }
 
-        try repository.runScript(line: nil, openPullRequests: 0)
+        try repository.runScript(line: nil, openPullRequests: "[]")
 
         #expect(try repository.remoteBranches().isEmpty)
         #expect(try repository.log("gh.log").allSatisfy { $0.hasPrefix("pr list") })
@@ -173,11 +182,11 @@ struct RulesPullRequestTests {
         defer { repository.remove() }
         try repository.pushBranch([title, "Add the fixture for the new API"])
 
-        try repository.runScript(line: "v3", openPullRequests: 1)
+        try repository.runScript(line: "v3", openPullRequests: ownPullRequest)
 
         #expect(try repository.subjects(branch).prefix(3) == [title, "Add the fixture for the new API", title])
         #expect(try repository.remoteRules(branch) == "v1\nv3\n")
-        #expect(try repository.log("gh.log").contains { $0.hasPrefix("pr comment \(branch) --body-file ") })
+        #expect(try repository.log("gh.log").contains { $0.hasPrefix("pr comment 7 --body-file ") })
     }
 
     @Test("a branch without an open pull request restarts from main")
@@ -186,7 +195,7 @@ struct RulesPullRequestTests {
         defer { repository.remove() }
         try repository.pushBranch(["Stale refresh"])
 
-        try repository.runScript(line: "v2", openPullRequests: 0)
+        try repository.runScript(line: "v2", openPullRequests: "[]")
 
         #expect(try repository.subjects(branch) == [title, "Main"])
     }
@@ -201,7 +210,7 @@ struct RulesPullRequestTests {
         try repository.commit(work, title)
         try repository.git(["push", "--quiet", "origin", branch], in: work)
 
-        try repository.runScript(line: nil, openPullRequests: 1)
+        try repository.runScript(line: nil, openPullRequests: ownPullRequest)
 
         #expect(try repository.subjects(branch).count == 2)
         #expect(try repository.log("gh.log").allSatisfy { $0.hasPrefix("pr list") })
