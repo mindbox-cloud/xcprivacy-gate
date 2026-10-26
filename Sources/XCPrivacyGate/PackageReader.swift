@@ -2,14 +2,12 @@ import Foundation
 
 package struct PackageTarget: Equatable, Sendable {
     package let name: String
-    package let path: URL
     package let sources: [URL]
     package let manifest: URL?
     package let definesDebugInRelease: Bool
 
-    package init(name: String, path: URL, sources: [URL], manifest: URL?, definesDebugInRelease: Bool) {
+    package init(name: String, sources: [URL], manifest: URL?, definesDebugInRelease: Bool) {
         self.name = name
-        self.path = path
         self.sources = sources
         self.manifest = manifest
         self.definesDebugInRelease = definesDebugInRelease
@@ -178,7 +176,6 @@ private extension DescribedPackage.Target {
         }
         return PackageTarget(
             name: name,
-            path: directory,
             sources: files.filter { $0.pathExtension == "swift" },
             manifest: declared.map { URL(fileURLWithPath: $0.path, isDirectory: false) },
             definesDebugInRelease: definesDebugInRelease

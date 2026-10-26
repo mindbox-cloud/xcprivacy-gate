@@ -21,7 +21,6 @@ private func day(_ text: String) throws -> Date {
 private func target(_ name: String, manifest: Bool = true) -> PackageTarget {
     PackageTarget(
         name: name,
-        path: URL(fileURLWithPath: "/package/\(name)", isDirectory: true),
         sources: [],
         manifest: manifest ? URL(fileURLWithPath: "/package/\(name)/PrivacyInfo.xcprivacy") : nil,
         definesDebugInRelease: false

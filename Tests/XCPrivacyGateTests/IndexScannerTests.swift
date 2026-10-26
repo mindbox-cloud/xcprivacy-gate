@@ -40,13 +40,7 @@ private struct Sample {
     }
 
     func target(_ name: String, _ sources: [URL]) -> PackageTarget {
-        PackageTarget(
-            name: name,
-            path: root.appending(path: "Sources/\(name)", directoryHint: .isDirectory),
-            sources: sources,
-            manifest: nil,
-            definesDebugInRelease: false
-        )
+        PackageTarget(name: name, sources: sources, manifest: nil, definesDebugInRelease: false)
     }
 }
 

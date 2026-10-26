@@ -59,7 +59,7 @@ private struct Products {
     func findings(_ targets: [String], suites: [String] = []) throws -> [String: ModuleFindings] {
         try BinaryScanner.findings(
             build: SDKBuild(indexStore: directory.appending(path: "index"), products: directory),
-            targets: targets.map { PackageTarget(name: $0, path: directory.appending(path: $0), sources: [], manifest: nil, definesDebugInRelease: false) },
+            targets: targets.map { PackageTarget(name: $0, sources: [], manifest: nil, definesDebugInRelease: false) },
             rules: binaryRules(),
             usage: Usage(entries: [], overrides: [], privateSuites: suites)
         )

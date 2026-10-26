@@ -89,7 +89,7 @@ package enum SelfTest {
             )
         }
         let fixtures = zip(files, sources).map { file, source in
-            BuiltFixture(file: file, target: pseudoTarget(source.deletingPathExtension().lastPathComponent, path: source.deletingLastPathComponent(), sources: [source]))
+            BuiltFixture(file: file, target: pseudoTarget(source.deletingPathExtension().lastPathComponent, sources: [source]))
         }
         return FixtureBuild(root: root, index: index, fixtures: fixtures, platforms: platforms)
     }
@@ -112,7 +112,7 @@ package enum SelfTest {
         for platform in build.platforms {
             let objects = try BinaryScanner.findings(build: platform.objects, targets: targets, rules: rules, usage: noUsage)
             violations += compare(lane: "binary \(platform.triple) object", found: objects, expectations: expectations)
-            let library = pseudoTarget(FixtureCompiler.module, path: platform.library.products, sources: [])
+            let library = pseudoTarget(FixtureCompiler.module, sources: [])
             let linked = try BinaryScanner.findings(build: platform.library, targets: [library], rules: rules, usage: noUsage)
             violations += missed(in: apis(linked[library.name]), triple: platform.triple, expectations: expectations)
         }
@@ -163,7 +163,7 @@ package enum SelfTest {
         Violation(code: code, module: nil, message: message, file: expectation.file)
     }
 
-    private static func pseudoTarget(_ name: String, path: URL, sources: [URL]) -> PackageTarget {
-        PackageTarget(name: name, path: path, sources: sources, manifest: nil, definesDebugInRelease: false)
+    private static func pseudoTarget(_ name: String, sources: [URL]) -> PackageTarget {
+        PackageTarget(name: name, sources: sources, manifest: nil, definesDebugInRelease: false)
     }
 }

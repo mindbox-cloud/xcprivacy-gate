@@ -74,7 +74,6 @@ struct PackageReaderTests {
             let targets = Dictionary(uniqueKeysWithValues: description.targets.map { ($0.name, $0) })
             #expect(Set(targets.keys) == ["Core", "Notifications", "SDKVersionProvider", "Logger"])
             let core = try #require(targets["Core"])
-            #expect(core.path.path == root.appendingPathComponent("Core").path)
             #expect(core.sources.map(\.path) == [
                 root.appendingPathComponent("Core/CoreController/CoreController.swift").path,
                 root.appendingPathComponent("Core/Core.swift").path
@@ -169,7 +168,6 @@ struct PackageReaderTests {
 
             let target = try #require(readPackage(package).targets.first)
 
-            #expect(target.path.path == root.path)
             #expect(target.sources.map(\.path) == [root.appendingPathComponent("Sub/A.swift").path])
         }
     }
@@ -218,16 +216,16 @@ struct PackageReaderTests {
             #expect(description.name == "Probe")
             #expect(!description.root.path.contains("/link"))
             #expect(description.targets.map(\.name).sorted() == ["Legacy", "Swifty"])
+            let sources = description.root.appendingPathComponent("Sources")
             let swifty = try #require(description.targets.first { $0.name == "Swifty" })
-            #expect(swifty.path.path == description.root.appendingPathComponent("Sources/Swifty").path)
-            #expect(swifty.sources.map(\.path).sorted() == [swifty.path.appendingPathComponent("A.swift").path, swifty.path.appendingPathComponent("Sub/B.swift").path])
-            #expect(swifty.manifest?.path == swifty.path.appendingPathComponent("PrivacyInfo.xcprivacy").path)
+            #expect(swifty.sources.map(\.path).sorted() == [sources.appendingPathComponent("Swifty/A.swift").path, sources.appendingPathComponent("Swifty/Sub/B.swift").path])
+            #expect(swifty.manifest?.path == sources.appendingPathComponent("Swifty/PrivacyInfo.xcprivacy").path)
             let legacy = try #require(description.targets.first { $0.name == "Legacy" })
             #expect(legacy.sources == [])
-            #expect(legacy.manifest?.path == legacy.path.appendingPathComponent("PrivacyInfo.xcprivacy").path)
+            #expect(legacy.manifest?.path == sources.appendingPathComponent("Legacy/PrivacyInfo.xcprivacy").path)
             #expect(codes(description.violations) == ["UNSCANNABLE_SOURCE", "UNSCANNABLE_SOURCE"])
             #expect(Set(description.violations.compactMap(\.module)) == ["Legacy"])
-            #expect(Set(description.violations.compactMap(\.file)) == [legacy.path.appendingPathComponent("Legacy.m").path, legacy.path.appendingPathComponent("Helper.c").path])
+            #expect(Set(description.violations.compactMap(\.file)) == [sources.appendingPathComponent("Legacy/Legacy.m").path, sources.appendingPathComponent("Legacy/Helper.c").path])
         }
     }
 

@@ -92,9 +92,8 @@ private struct SamplePackage: Sendable {
         targets = Set(files.keys.filter { $0.hasPrefix("Sources/") && $0.hasSuffix(".swift") }.map { $0.split(separator: "/")[1] })
             .sorted()
             .map { name in
-                let path = root.appending(path: "Sources/\(name)", directoryHint: .isDirectory)
                 let sources = files.keys.filter { $0.hasPrefix("Sources/\(name)/") && $0.hasSuffix(".swift") }.sorted().map { root.appending(path: $0) }
-                return PackageTarget(name: String(name), path: path, sources: sources, manifest: nil, definesDebugInRelease: false)
+                return PackageTarget(name: String(name), sources: sources, manifest: nil, definesDebugInRelease: false)
             }
     }
 
@@ -205,13 +204,7 @@ struct PackageBuilderTests {
     func targetTheBuildCannotProduceIsToolError() throws {
         try withTemporaryDirectory { directory in
             let package = try SamplePackage(at: directory.appending(path: "Sample"), files: oneTargetFiles("public let answer = 42\n"))
-            let missing = PackageTarget(
-                name: "Notifications",
-                path: package.root.appending(path: "Sources/Notifications"),
-                sources: [],
-                manifest: nil,
-                definesDebugInRelease: false
-            )
+            let missing = PackageTarget(name: "Notifications", sources: [], manifest: nil, definesDebugInRelease: false)
 
             let error = #expect(throws: ToolError.self) {
                 try PackageBuilder.build(root: package.root, targets: package.targets + [missing], work: directory.appending(path: "work"))
