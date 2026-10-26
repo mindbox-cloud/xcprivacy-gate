@@ -44,12 +44,8 @@ package struct Usage: Sendable {
     }
 
     package static func load(_ url: URL, rules: Rules, userDefaultsAppGroup: Bool) throws -> Usage {
-        let file = url.standardizedFileURL
-        do {
-            let raw = try StrictJSON.decode(RawUsage.self, contentsOf: file, document: "usage.json")
-            return try Usage(raw, rules: rules, userDefaultsAppGroup: userDefaultsAppGroup)
-        } catch let error as ToolError {
-            throw ToolError(message: "\(file.path): \(error.message)")
+        try ToolError.inFile(url) { file in
+            try Usage(StrictJSON.decode(RawUsage.self, contentsOf: file, document: "usage.json"), rules: rules, userDefaultsAppGroup: userDefaultsAppGroup)
         }
     }
 

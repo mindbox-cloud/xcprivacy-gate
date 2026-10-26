@@ -69,14 +69,8 @@ package enum SDKList {
         }
     }
 
-    package static func read(_ file: URL) throws -> [String] {
-        let text: String
-        do {
-            text = try String(contentsOf: file, encoding: .utf8)
-        } catch {
-            throw ToolError(message: "\(file.path): cannot read Apple's SDK list: \(error.localizedDescription)")
-        }
-        return text.split(separator: "\n").map(String.init)
+    package static func names(fromText text: String) -> [String] {
+        text.split(separator: "\n").map(String.init)
     }
 
     static func text(_ names: [String]) -> String {

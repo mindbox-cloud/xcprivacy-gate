@@ -26,6 +26,17 @@ package struct ToolError: Error, CustomStringConvertible {
     package var description: String { message }
 }
 
+extension ToolError {
+    static func inFile<Value>(_ url: URL, _ body: (URL) throws -> Value) throws -> Value {
+        let file = url.standardizedFileURL
+        do {
+            return try body(file)
+        } catch let error as ToolError {
+            throw ToolError(message: "\(file.path): \(error.message)")
+        }
+    }
+}
+
 package enum Report {
     package static func annotation(_ violation: Violation, root: URL) -> String {
         var properties: [String] = []

@@ -9,12 +9,7 @@ package struct GateConfig: Sendable {
     package let appleSdkList: AppleSDKListing?
 
     package static func load(_ url: URL) throws -> GateConfig {
-        let file = url.standardizedFileURL
-        do {
-            return try GateConfig(file: file)
-        } catch let error as ToolError {
-            throw ToolError(message: "\(file.path): \(error.message)")
-        }
+        try ToolError.inFile(url) { try GateConfig(file: $0) }
     }
 
     private init(file: URL) throws {

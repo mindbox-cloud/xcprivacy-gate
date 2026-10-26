@@ -145,12 +145,9 @@ extension RulesFile {
     package static let fileName = "rules.json"
 
     static func load(_ url: URL) throws -> (file: RulesFile, rules: Rules) {
-        let path = url.standardizedFileURL
-        do {
+        try ToolError.inFile(url) { path in
             let file = try StrictJSON.decode(RulesFile.self, contentsOf: path, document: "the rules")
             return (file, try Rules(file))
-        } catch let error as ToolError {
-            throw ToolError(message: "\(path.path): \(error.message)")
         }
     }
 }

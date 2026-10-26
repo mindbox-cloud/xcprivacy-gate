@@ -17,4 +17,12 @@ extension URL {
         defer { free(resolved) }
         return String(cString: resolved)
     }
+
+    func text() throws -> String {
+        do {
+            return try String(contentsOf: self, encoding: .utf8)
+        } catch {
+            throw ToolError(message: "\(path): cannot read the file: \(error.localizedDescription)")
+        }
+    }
 }

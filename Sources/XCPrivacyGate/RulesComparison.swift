@@ -35,8 +35,7 @@ struct RulesComparison {
             texts[Self.tn3181File] = pages.tn3181
             changes.append(RefreshChange(text: "TN3181 text changed; see the diff below", page: .tn3181))
         }
-        let sdkFile = rulesDirectory.appending(path: SDKList.fileName)
-        let savedSdks = FileManager.default.fileExists(atPath: sdkFile.path) ? try SDKList.read(sdkFile) : []
+        let savedSdks = try SDKList.names(fromText: Self.savedText(rulesDirectory.appending(path: SDKList.fileName)))
         if savedSdks != pages.sdks {
             texts[SDKList.fileName] = SDKList.text(pages.sdks)
             changes += pages.sdks.filter { !savedSdks.contains($0) }.map { RefreshChange(text: "Apple's SDK list adds `\($0)`", page: .sdkList) }
@@ -178,14 +177,7 @@ struct RulesComparison {
     }
 
     private static func savedText(_ file: URL) throws -> String {
-        guard FileManager.default.fileExists(atPath: file.path) else {
-            return ""
-        }
-        do {
-            return try String(contentsOf: file, encoding: .utf8)
-        } catch {
-            throw ToolError(message: "\(file.path): cannot read the saved text: \(error.localizedDescription)")
-        }
+        FileManager.default.fileExists(atPath: file.path) ? try file.text() : ""
     }
 
     private static func lineDiff(from old: String, to new: String) -> [String] {

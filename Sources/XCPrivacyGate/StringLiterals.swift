@@ -18,7 +18,7 @@ package enum StringLiterals {
             var privateSuites: Set<String> = []
             for source in target.sources {
                 let file = Report.repositoryPath(of: source, root: root)
-                for literal in try swiftLiterals(in: contents(of: source), definesDebugInRelease: target.definesDebugInRelease) {
+                for literal in try swiftLiterals(in: source.text(), definesDebugInRelease: target.definesDebugInRelease) {
                     findings += apisByString[literal.value, default: []].map { rule in
                         Finding(api: rule.api, categories: Set(rule.categories), file: file, line: literal.line, evidence: "string literal")
                     }
@@ -40,14 +40,6 @@ package enum StringLiterals {
         )
         collector.walk(tree)
         return collector.literals
-    }
-
-    private static func contents(of source: URL) throws -> String {
-        do {
-            return try String(contentsOf: source, encoding: .utf8)
-        } catch {
-            throw ToolError(message: "\(source.path) could not be read: \(error.localizedDescription)")
-        }
     }
 }
 

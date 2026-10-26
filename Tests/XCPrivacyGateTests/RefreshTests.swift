@@ -316,13 +316,13 @@ struct RefreshTests {
         var pages = try SavedPages()
         let directory = try pages.rulesDirectory()
         defer { try? FileManager.default.removeItem(at: directory) }
-        let before = try SDKList.read(directory.appending(path: SDKList.fileName))
+        let before = try SDKList.names(fromText: String(contentsOf: directory.appending(path: SDKList.fileName), encoding: .utf8))
         try pages.editHTML(.sdkList, replacing: "<li>Abseil</li>", with: "<li>Abseil</li>\n<li>Sample</li>")
         try pages.editHTML(.sdkList, replacing: "<li>Alamofire</li>", with: "")
 
         let result = try await refresh(pages, in: directory)
 
-        let after = try SDKList.read(directory.appending(path: SDKList.fileName))
+        let after = try SDKList.names(fromText: String(contentsOf: directory.appending(path: SDKList.fileName), encoding: .utf8))
         #expect(after == [before[0], "Sample"] + before.dropFirst().filter { $0 != "Alamofire" })
         #expect(result.changed)
         #expect(result.body.contains("Apple's SDK list adds `Sample`"))
