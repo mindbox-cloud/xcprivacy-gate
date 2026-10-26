@@ -32,7 +32,7 @@ package enum AppleDocs {
             var reasons: [String: String] = [:]
             for item in try reasonList.nodes("items") {
                 let code = try reasonCode(item, category: category)
-                reasons[code] = try definitionText(item, references: references)
+                reasons[code] = try definitionText(item, references: references, category: category, code: code)
             }
             let apis = try apiList.nodes("items").map { try apiEntry($0, references: references, category: category) }
             guard !reasons.isEmpty, !apis.isEmpty else {
@@ -116,10 +116,12 @@ package enum AppleDocs {
         return code
     }
 
-    private static func definitionText(_ item: DocCNode, references: DocCNode) throws -> String {
-        try item.node("definition").nodes("content")
-            .map { try inlineText($0.nodes("inlineContent"), references: references) }
-            .joined(separator: " ")
+    private static func definitionText(_ item: DocCNode, references: DocCNode, category: String, code: String) throws -> String {
+        do {
+            return try blockLines(item.node("definition").nodes("content"), references: references).joined(separator: " ")
+        } catch let error as ToolError {
+            throw ToolError(message: "\(category): reason \(code): \(error.message)")
+        }
     }
 
     private static func inlineText(_ nodes: [DocCNode], references: DocCNode) throws -> String {
