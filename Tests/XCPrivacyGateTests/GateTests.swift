@@ -159,6 +159,15 @@ struct GateTests {
         #expect(try text(result.standardOutputContent).hasPrefix("OVERVIEW: "))
     }
 
+    @Test("--version exits 0 and prints the tool version")
+    func versionExitsZero() async throws {
+        let result = try await #require(processExitsWith: .success, observing: [\.standardOutputContent]) {
+            await runCommand(["--version"], stepSummary: nil)
+        }
+
+        #expect(try text(result.standardOutputContent) == "\(ToolVersion.current)\n")
+    }
+
     @Test("a package with an Objective-C target fails with UNSCANNABLE_SOURCE, and package and manifest violations come before the policy ones")
     func objectiveCTargetIsUnscannable() throws {
         try withTemporaryDirectory { root in
