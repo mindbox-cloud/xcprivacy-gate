@@ -190,6 +190,36 @@ struct StringLiteralsTests {
         ])
     }
 
+    @Test("a version check decides nothing alone: a clause counts when some outcome of the check makes it active")
+    func versionCheckCountsUnderEitherOutcome() {
+        #expect(branchLiterals("os(macOS) && swift(>=5.9)") == [elseBranch])
+        #expect(branchLiterals("swift(>=5.9) || os(macOS)") == [ifBranch, elseBranch])
+        #expect(branchLiterals("!compiler(>=6)") == [ifBranch, elseBranch])
+    }
+
+    @Test("an #if swift(>=6) chain keeps its first clause and its #else and drops an #elseif os(macOS)")
+    func swiftVersionChainDropsMacOSClause() {
+        #expect(literals(
+            "#if swift(>=6)",
+            #"let a = "NSFileCreationDate""#,
+            "#elseif os(macOS)",
+            #"let b = "NSFileSystemSize""#,
+            "#else",
+            #"let c = "NSFileSystemFreeSize""#,
+            "#endif"
+        ) == [
+            Literal(value: "NSFileCreationDate", line: 2),
+            Literal(value: "NSFileSystemFreeSize", line: 6)
+        ])
+    }
+
+    @Test("a condition with more than eight version checks keeps every clause", arguments: [(8, false), (9, true)])
+    func versionCheckCap(checks: Int, keepsEveryClause: Bool) {
+        let condition = (["os(macOS)"] + (1...checks).map { "swift(>=\($0))" }).joined(separator: " && ")
+
+        #expect(branchLiterals(condition) == (keepsEveryClause ? [ifBranch, elseBranch] : [elseBranch]))
+    }
+
     @Test("an os(macOS) clause without a version check is still skipped inside an #if that checks one")
     func macOSClauseInsideVersionCheckIsSkipped() {
         #expect(literals(
