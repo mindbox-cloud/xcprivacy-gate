@@ -199,8 +199,8 @@ struct GateConfigTests {
         }
     }
 
-    @Test("the rules bundle holds rules.json, every fixture, tn3181.txt and Apple's SDK list")
-    func rulesBundleHoldsRulesFixturesAndTechnote() throws {
+    @Test("the rules bundle holds rules.json and every fixture")
+    func rulesBundleHoldsRulesAndFixtures() throws {
         let directory = RulesBundle.directory
         let sourceRules = repositoryRoot.appendingPathComponent("Rules", isDirectory: true)
 
@@ -208,8 +208,6 @@ struct GateConfigTests {
         let bundledFixtures = try relativeFiles(under: directory.appendingPathComponent("fixtures"))
 
         #expect(FileManager.default.fileExists(atPath: directory.appendingPathComponent("rules.json").path))
-        #expect(FileManager.default.fileExists(atPath: directory.appendingPathComponent("apple/tn3181.txt").path))
-        #expect(try !SDKList.read(directory.appendingPathComponent(SDKList.fileName)).isEmpty)
         #expect(!expectedFixtures.isEmpty)
         #expect(bundledFixtures == expectedFixtures)
     }

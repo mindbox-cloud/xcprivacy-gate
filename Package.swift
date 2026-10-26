@@ -16,10 +16,10 @@ let package = Package(
         .target(
             name: "XCPrivacyGateRules",
             path: "Rules",
+            exclude: ["apple"],
             resources: [
                 .copy("rules.json"),
-                .copy("fixtures"),
-                .copy("apple")
+                .copy("fixtures")
             ]
         ),
         .target(
