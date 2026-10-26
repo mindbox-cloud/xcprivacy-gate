@@ -241,6 +241,28 @@ struct GateTests {
         }
     }
 
+    @Test("a source in a target directory symlinked from outside the checkout exits 2 naming the file")
+    func sourceOutsideCheckoutExitsTwo() async throws {
+        let directory = try makeTemporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let root = directory.appending(path: "repository", directoryHint: .isDirectory)
+        let config = try makeGateRepository(at: root, try gateFiles().merging([
+            "Package.swift": packageManifest(#"Package(name: "Sample", platforms: [.iOS(.v15)], targets: [.target(name: "Core", path: "Sources/Core")])"#)
+        ]) { $1 })
+        try writeFile("public let answer = 42\n", to: directory.appending(path: "shared/Core/Answer.swift"))
+        try FileManager.default.createDirectory(at: root.appending(path: "Sources"), withIntermediateDirectories: true)
+        try FileManager.default.createSymbolicLink(atPath: root.appending(path: "Sources/Core").path, withDestinationPath: "../../shared/Core")
+        let arguments = ["check", "--config", config.path]
+
+        let result = try await #require(processExitsWith: .exitCode(2), observing: [\.standardErrorContent]) { [arguments = arguments as [String]] in
+            await runCommand(arguments, stepSummary: nil)
+        }
+
+        let errors = try text(result.standardErrorContent)
+        #expect(errors.contains("Sources/Core/Answer.swift resolves to "))
+        #expect(errors.contains("/shared/Core/Answer.swift, outside the git checkout"))
+    }
+
     @Test("a package below a repository root reached through a symlink keeps findings, usage.json entries and annotations repository-relative")
     func packageBelowRepositoryRoot() throws {
         try withTemporaryDirectory { directory in
