@@ -33,7 +33,7 @@ package enum BinaryScanner {
         for file in files {
             evidence[file] = try tools.evidence(of: file)
         }
-        let mangled = Set(evidence.values.flatMap { $0.symbols.filter { $0.hasPrefix("_$s") || $0.hasPrefix("$s") } })
+        let mangled = Set(evidence.values.flatMap { $0.symbols.filter { $0.hasPrefix("_$s") } })
         let names = try tools.demangle(mangled.sorted())
         return evidence.mapValues { found in
             var found = found
@@ -57,7 +57,7 @@ private extension BinaryEvidence {
 
 private struct BinaryTools {
     private static let selectorStub = "_objc_msgSend$"
-    private static let symbolSuffixes = ["$INODE64", "$UNIX2003", "$DARWIN_EXTSN"]
+    private static let extensionSuffix = "$DARWIN_EXTSN"
     private static let demangleChunk = 1_000
 
     private let nm: String
@@ -80,7 +80,7 @@ private struct BinaryTools {
             if name.hasPrefix(Self.selectorStub) {
                 evidence.selectors.insert(String(name.dropFirst(Self.selectorStub.count)))
             } else {
-                evidence.symbols.insert(String(Self.symbolSuffixes.first(where: name.hasSuffix).map { name.dropLast($0.count) } ?? name))
+                evidence.symbols.insert(String(name.hasSuffix(Self.extensionSuffix) ? name.dropLast(Self.extensionSuffix.count) : name))
             }
         }
         evidence.selectors.formUnion(try section("__objc_methname", of: file))

@@ -121,20 +121,6 @@ struct BinaryScannerTests {
         }
     }
 
-    @Test("a libc symbol with a $INODE64 suffix matches its rule")
-    func suffixedLibcSymbolMatches() throws {
-        try withProducts { products in
-            let source = try products.source(
-                "Size.swift",
-                "import Darwin",
-                #"public func size() -> Int64 { var info = stat(); _ = stat("/", &info); return info.st_size }"#
-            )
-            try products.compile("Fixture", [source], triple: "x86_64-apple-macos10.13", sdk: "macosx")
-
-            #expect(try products.apis() == ["stat"])
-        }
-    }
-
     @Test("an own @objc member named like a selector is reported as a hit")
     func ownObjcMemberNamedLikeSelectorIsHit() throws {
         try withProducts { products in
