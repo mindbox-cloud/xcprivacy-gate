@@ -284,6 +284,26 @@ struct ManifestValidatorTests {
         #expect(try codes(manifestXML().replacing("</dict></plist>", with: "</dict>stray</plist>")) == ["MANIFEST_UNREADABLE"])
     }
 
+    @Test(
+        "a manifest that Apple's parser reads is readable with blank lines before the declaration or content after the closing tag",
+        arguments: [
+            ("\n", ""),
+            ("\r\n", ""),
+            ("", "\u{0}"),
+            ("", "stray")
+        ]
+    )
+    func manifestApplesParserReadsIsReadable(prefix: String, suffix: String) throws {
+        #expect(try codes(prefix + manifestXML() + suffix) == [])
+    }
+
+    @Test("a duplicate key after a blank line before the declaration is rejected")
+    func duplicateKeyAfterLeadingBlankLineIsRejected() throws {
+        let message = try message(of: "MANIFEST_DUPLICATE_KEY", in: "\n" + manifestXML(extra: "<key>NSPrivacyTracking</key><true/>"))
+
+        #expect(message.contains("'NSPrivacyTracking'"))
+    }
+
     @Test("an XML entity declaration makes the manifest unreadable", arguments: [
         "<!ENTITY unused \"CA92.1\">",
         "<!ENTITY % unused \"CA92.1\">",
