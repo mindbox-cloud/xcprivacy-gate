@@ -130,8 +130,8 @@ Unknown keys are a tool error.
 ```
 
 - `calls` registers each file that calls a required-reason API: the target, the file's path relative to the
-  repository root, the API's name in `Rules/rules.json`, one of Apple's reasons for its category, and why the code
-  calls it.
+  repository root with symlinks resolved, the API's name in `Rules/rules.json`, one of Apple's reasons for its
+  category, and why the code calls it.
 - `privateUserDefaultsSuites` lists the suite names that need `CA92.1` under `userDefaultsAppGroup`.
 - `overrides` declares a category that no visible call explains, for example after an email from App Store Connect.
   Each override needs evidence and an `expires` date (`YYYY-MM-DD`); `check` fails once the date passes.

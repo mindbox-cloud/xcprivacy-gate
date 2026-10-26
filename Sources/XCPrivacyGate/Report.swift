@@ -73,6 +73,10 @@ package enum Report {
         "Privacy manifest gate, \(title): \(violations.count) \(violations.count == 1 ? "violation" : "violations")"
     }
 
+    static func repositoryPath(of source: URL, root: URL) -> String {
+        repositoryRelative(source.canonicalPath, root: URL(fileURLWithPath: root.canonicalPath, isDirectory: true))
+    }
+
     static func repositoryRelative(_ path: String, root: URL) -> String {
         guard path.hasPrefix("/") else { return path }
         let rootComponents = root.standardizedFileURL.pathComponents

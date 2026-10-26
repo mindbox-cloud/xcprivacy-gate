@@ -22,7 +22,7 @@ package struct IndexScanner {
 
     package func findings(targets: [PackageTarget], rules: Rules, root: URL) throws -> [String: ModuleFindings] {
         let matchers = rules.apis.values.sorted { $0.api < $1.api }.map(UsrMatcher.init)
-        return try read(targets.flatMap(\.sources), root: root) { index, root in
+        return try read(targets.flatMap(\.sources), root: root) { index in
             var modules: [String: ModuleFindings] = [:]
             for target in targets {
                 modules[target.name] = Self.findings(in: target, index: index, matchers: matchers, root: root)
@@ -32,7 +32,7 @@ package struct IndexScanner {
     }
 
     package func usrs(in sources: [URL], root: URL) throws -> [URL: Set<String>] {
-        try read(sources, root: root) { index, _ in
+        try read(sources, root: root) { index in
             var usrs: [URL: Set<String>] = [:]
             for source in sources {
                 usrs[source] = Set(Self.references(in: source, index: index).map(\.symbol.usr))
@@ -41,20 +41,20 @@ package struct IndexScanner {
         }
     }
 
-    private func read<Result>(_ sources: [URL], root: URL, _ body: (IndexStoreDB, URL) -> Result) throws -> Result {
+    private func read<Result>(_ sources: [URL], root: URL, _ body: (IndexStoreDB) -> Result) throws -> Result {
         try WorkDirectory.with { work in
-            try scan(sources, root: URL(fileURLWithPath: root.canonicalPath, isDirectory: true), database: work.appending(path: "database"), body)
+            try scan(sources, root: root, database: work.appending(path: "database"), body)
         }
     }
 
-    private func scan<Result>(_ sources: [URL], root: URL, database: URL, _ body: (IndexStoreDB, URL) -> Result) throws -> Result {
+    private func scan<Result>(_ sources: [URL], root: URL, database: URL, _ body: (IndexStoreDB) -> Result) throws -> Result {
         let index = try open(database)
         let unindexed = sources.filter { index.dateOfLatestUnitFor(filePath: $0.path) == nil }
         guard unindexed.isEmpty else {
-            let files = unindexed.map { Self.repositoryPath(of: $0, root: root) }.joined(separator: ", ")
+            let files = unindexed.map { Report.repositoryPath(of: $0, root: root) }.joined(separator: ", ")
             throw ToolError(message: "the build index has no data for \(files): the build did not compile them, so the source scan cannot read them")
         }
-        return body(index, root)
+        return body(index)
     }
 
     private func open(_ database: URL) throws -> IndexStoreDB {
@@ -72,7 +72,7 @@ package struct IndexScanner {
         var findings: [Finding] = []
         var usesStandardDefaults = false
         for source in target.sources {
-            let file = repositoryPath(of: source, root: root)
+            let file = Report.repositoryPath(of: source, root: root)
             for occurrence in references(in: source, index: index) {
                 let symbol = occurrence.symbol
                 usesStandardDefaults = usesStandardDefaults || standardDefaults.contains(symbol.usr)
@@ -86,10 +86,6 @@ package struct IndexScanner {
 
     private static func references(in source: URL, index: IndexStoreDB) -> [SymbolOccurrence] {
         index.symbolOccurrences(inFilePath: source.path).sorted().filter { $0.roles.isDisjoint(with: [.definition, .declaration]) }
-    }
-
-    private static func repositoryPath(of source: URL, root: URL) -> String {
-        Report.repositoryRelative(source.canonicalPath, root: root)
     }
 }
 

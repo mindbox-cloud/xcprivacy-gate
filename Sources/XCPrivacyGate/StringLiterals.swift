@@ -17,7 +17,7 @@ package enum StringLiterals {
             var findings: [Finding] = []
             var privateSuites: Set<String> = []
             for source in target.sources {
-                let file = Report.repositoryRelative(source.path, root: root)
+                let file = Report.repositoryPath(of: source, root: root)
                 for literal in try swiftLiterals(in: contents(of: source), definesDebugInRelease: target.definesDebugInRelease) {
                     findings += apisByString[literal.value, default: []].map { rule in
                         Finding(api: rule.api, categories: Set(rule.categories), file: file, line: literal.line, evidence: "string literal")
