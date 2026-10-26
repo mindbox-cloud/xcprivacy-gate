@@ -23,11 +23,10 @@ private func bootTimeCall(_ api: String, in file: String) -> [String: String] {
     ["module": "Lib", "file": file, "api": api, "reason": "35F9.1", "purpose": "Measure elapsed time"]
 }
 
-private func gateFiles(packagePath: String? = nil, calls: [[String: String]] = []) throws -> [String: String] {
+private func gateFiles(packagePath: String? = nil, calls: [[String: String]] = [], appleSdkList: [String: Any]? = nil) throws -> [String: String] {
     var config: [String: Any] = ["usage": "usage.json", "policy": ["userDefaultsAppGroup": false, "trackingDisabled": true]]
-    if let packagePath {
-        config["packagePath"] = packagePath
-    }
+    config["packagePath"] = packagePath
+    config["appleSdkList"] = appleSdkList
     let usage: [String: Any] = ["calls": calls, "privateUserDefaultsSuites": [String](), "overrides": [String]()]
     return [
         ".github/privacy-manifest/config.json": try json(config),
@@ -188,6 +187,23 @@ struct GateTests {
                 == "::error file=Lib/Legacy.m,title=UNSCANNABLE_SOURCE::Lib: Legacy.m is not Swift; the source scan cannot read it")
             #expect(violations.last?.file == "Core/Clock.swift")
             #expect(violations.last?.line == 3)
+        }
+    }
+
+    @Test("check puts SDK_ON_APPLE_LIST first when the bundled Apple list names the SDK that the config marks as not listed")
+    func bundledAppleListNamesConfiguredSdk() throws {
+        let listed = try #require(SDKList.read(RulesBundle.directory.appending(path: SDKList.fileName)).first)
+        try withTemporaryDirectory { root in
+            let configFile = try makeRepository(at: root, try gateFiles(appleSdkList: ["name": listed, "listed": false]).merging([
+                "Package.swift": libPackage,
+                "Lib/Clock.swift": clock,
+                "Lib/PrivacyInfo.xcprivacy": privacyManifest([bootTime: "35F9.1"])
+            ]) { $1 })
+
+            let violations = try check(configFile).violations
+
+            #expect(violations.map(\.code) == ["SDK_ON_APPLE_LIST", "UNREGISTERED_CALL"])
+            #expect(violations.first?.message.contains("names \(listed)") == true)
         }
     }
 

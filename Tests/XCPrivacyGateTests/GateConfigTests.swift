@@ -5,7 +5,9 @@ import XCPrivacyGateRules
 
 @Suite("Gate config")
 struct GateConfigTests {
-    private let validConfig = #"{"usage": "usage.json", "packagePath": ".", "policy": {"userDefaultsAppGroup": true, "trackingDisabled": true}}"#
+    private let validConfig = #"""
+        {"usage": "usage.json", "packagePath": ".", "policy": {"userDefaultsAppGroup": true, "trackingDisabled": true}, "appleSdkList": {"name": "Sample", "listed": false}}
+        """#
 
     @Test("config resolves usage and package paths against its directory")
     func resolvesPathsAgainstItsDirectory() throws {
@@ -114,6 +116,28 @@ struct GateConfigTests {
         }
     }
 
+    @Test("appleSdkList is read when the config has it and absent when it does not")
+    func readsAppleSdkList() throws {
+        try withTemporaryDirectory { root in
+            try makeGitDirectory(in: root)
+            let listed = try GateConfig.load(writeConfig(validConfig, at: "listed.json", in: root))
+            let unlisted = try GateConfig.load(writeConfig(configText(setting: "appleSdkList", to: nil), at: "unlisted.json", in: root))
+
+            #expect(listed.appleSdkList?.name == "Sample")
+            #expect(listed.appleSdkList?.listed == false)
+            #expect(unlisted.appleSdkList == nil)
+        }
+    }
+
+    @Test("a missing appleSdkList key is a tool error naming it", arguments: ["appleSdkList.name", "appleSdkList.listed"])
+    func missingAppleSdkListKeyIsAnError(key: String) throws {
+        try withTemporaryDirectory { root in
+            let url = try writeConfig(try configText(setting: key, to: nil), at: "config.json", in: root)
+
+            #expect(try loadErrorMessage(url).contains("\"\(key)\""))
+        }
+    }
+
     @Test("a missing usage or policy section is a tool error naming it", arguments: ["usage", "policy"])
     func missingSectionIsAnError(key: String) throws {
         try withTemporaryDirectory { root in
@@ -123,7 +147,7 @@ struct GateConfigTests {
         }
     }
 
-    @Test("an unknown key is a tool error", arguments: ["extra", "policy.extra"])
+    @Test("an unknown key is a tool error", arguments: ["extra", "policy.extra", "appleSdkList.extra"])
     func unknownKeyIsAnError(key: String) throws {
         try withTemporaryDirectory { root in
             let url = try writeConfig(try configText(setting: key, to: "true"), at: "config.json", in: root)
@@ -141,7 +165,11 @@ struct GateConfigTests {
             ("policy", "\"yes\""),
             ("policy.userDefaultsAppGroup", "1"),
             ("policy.trackingDisabled", "\"true\""),
-            ("policy.trackingDisabled", "null")
+            ("policy.trackingDisabled", "null"),
+            ("appleSdkList", "true"),
+            ("appleSdkList", "null"),
+            ("appleSdkList.name", "1"),
+            ("appleSdkList.listed", "\"false\"")
         ]
     )
     func wrongTypeIsAnError(key: String, value: String) throws {
@@ -171,7 +199,7 @@ struct GateConfigTests {
         }
     }
 
-    @Test("the rules bundle holds rules.json, every fixture and tn3181.txt")
+    @Test("the rules bundle holds rules.json, every fixture, tn3181.txt and Apple's SDK list")
     func rulesBundleHoldsRulesFixturesAndTechnote() throws {
         let directory = RulesBundle.directory
         let sourceRules = repositoryRoot.appendingPathComponent("Rules", isDirectory: true)
@@ -181,6 +209,7 @@ struct GateConfigTests {
 
         #expect(FileManager.default.fileExists(atPath: directory.appendingPathComponent("rules.json").path))
         #expect(FileManager.default.fileExists(atPath: directory.appendingPathComponent("apple/tn3181.txt").path))
+        #expect(try !SDKList.read(directory.appendingPathComponent(SDKList.fileName)).isEmpty)
         #expect(!expectedFixtures.isEmpty)
         #expect(bundledFixtures == expectedFixtures)
     }
