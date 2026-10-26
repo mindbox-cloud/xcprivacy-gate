@@ -73,8 +73,9 @@ jobs:
 | `working-directory` | `.` | the directory the tool runs in |
 
 The action builds the tool from source at the pinned commit and caches the build by runner OS, Xcode version and
-commit. The first run builds for a few minutes; later runs reuse the cache. Pin a full commit SHA with the tag in a
-comment, as above.
+commit. The first run builds for a few minutes; later runs reuse the cache. The action saves the build before the
+gate runs, so a run that finds violations still leaves the cache for the next one. Pin a full commit SHA with the tag
+in a comment, as above.
 
 ### `config.json`
 
