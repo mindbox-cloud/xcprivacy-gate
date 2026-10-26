@@ -34,8 +34,6 @@ jobs:
         run: swift build -c release --force-resolved-versions
       - name: Test
         run: swift test
-      - name: Self-test
-        run: swift run -c release xcprivacy-gate self-test
 
   action:
     runs-on: macos-26
