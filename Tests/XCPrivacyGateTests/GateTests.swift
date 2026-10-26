@@ -19,6 +19,10 @@ private func privacyManifest(_ reasons: [String: String]) -> String {
         + "<plist version=\"1.0\"><dict><key>NSPrivacyTracking</key><false/><key>NSPrivacyAccessedAPITypes</key><array>\(entries.joined())</array></dict></plist>\n"
 }
 
+private let trackingManifest = #"<?xml version="1.0" encoding="UTF-8"?>"# + "\n"
+    + "<plist version=\"1.0\"><dict><key>NSPrivacyTracking</key><true/>"
+    + "<key>NSPrivacyTrackingDomains</key><array><string>tracker.example.com</string></array></dict></plist>\n"
+
 private func bootTimeCall(_ api: String, in file: String) -> [String: String] {
     ["module": "Lib", "file": file, "api": api, "reason": "35F9.1", "purpose": "Measure elapsed time"]
 }
@@ -192,6 +196,28 @@ struct GateTests {
 
             #expect(violations.map(\.code) == ["SDK_ON_APPLE_LIST", "UNREGISTERED_CALL"])
             #expect(violations.first?.message.contains("names \(listed)") == true)
+        }
+    }
+
+    @Test(
+        "check validates a manifest whatever the case of its file name and reports a name other than PrivacyInfo.xcprivacy",
+        arguments: [
+            ("PrivacyInfo.xcprivacy", "PrivacyInfo.xcprivacy", ["TRACKING_ENABLED"]),
+            ("privacyinfo.xcprivacy", "privacyinfo.xcprivacy", ["MANIFEST_FILE_NAME", "TRACKING_ENABLED"]),
+            ("Resources", "Resources/privacyinfo.xcprivacy", ["MANIFEST_FILE_NAME", "TRACKING_ENABLED"])
+        ] as [(String, String, [String])]
+    )
+    func manifestOfAnyNameCaseIsValidated(resource: String, file: String, codes: [String]) throws {
+        try withTemporaryDirectory { root in
+            let configFile = try makeGateRepository(at: root, try gateFiles().merging([
+                "Package.swift": packageManifest(
+                    #"Package(name: "Sample", platforms: [.iOS(.v15)], targets: [.target(name: "Lib", path: "Lib", resources: [.process("\#(resource)")])])"#
+                ),
+                "Lib/Answer.swift": "public let answer = 42\n",
+                "Lib/\(file)": trackingManifest
+            ]) { $1 })
+
+            #expect(try check(configFile).violations.map(\.code) == codes)
         }
     }
 

@@ -225,6 +225,36 @@ struct PackageReaderTests {
         }
     }
 
+    @Test(
+        "a manifest whose file name differs in case is the target's manifest, at the target root and in a resource directory",
+        arguments: [("privacyinfo.xcprivacy", "privacyinfo.xcprivacy"), ("Resources", "Resources/privacyinfo.xcprivacy")]
+    )
+    func wrongCaseManifestIsTheTargetsManifest(resource: String, file: String) throws {
+        let targets = #".target(name: "Swifty", resources: [.process("\#(resource)")])"#
+        try withTemporaryDirectory { directory in
+            let description = try describeAndRead(targets: targets, files: ["Sources/Swifty/A.swift", "Sources/Swifty/\(file)"], in: directory)
+
+            let swifty = try #require(description.targets.first)
+            #expect(swifty.manifest?.path == description.root.appendingPathComponent("Sources/Swifty/\(file)").path)
+            #expect(description.violations.isEmpty)
+        }
+    }
+
+    @Test("a manifest that describe drops because Package.swift names it in another case is MANIFEST_NOT_WIRED naming the file and its case")
+    func manifestDeclaredInAnotherCaseIsNotWired() throws {
+        let targets = #".target(name: "Swifty", resources: [.process("PrivacyInfo.xcprivacy")])"#
+        try withTemporaryDirectory { directory in
+            let description = try describeAndRead(targets: targets, files: ["Sources/Swifty/A.swift", "Sources/Swifty/privacyinfo.xcprivacy"], in: directory)
+
+            #expect(description.targets.first?.manifest == nil)
+            #expect(codes(description.violations) == ["MANIFEST_NOT_WIRED"])
+            let violation = try #require(description.violations.first)
+            #expect(violation.file == description.root.appendingPathComponent("Sources/Swifty/privacyinfo.xcprivacy").path)
+            #expect(violation.message.contains("privacyinfo.xcprivacy is not shipped as a resource"))
+            #expect(violation.message.contains("case"))
+        }
+    }
+
     @Test("excluded sources are not in sources")
     func excludedSourcesAreNotInSources() throws {
         let targets = #".target(name: "Swifty", exclude: ["Excluded.swift", "Old"])"#
