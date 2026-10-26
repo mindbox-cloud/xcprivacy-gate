@@ -31,7 +31,7 @@ package enum SelfTest {
 
     package static func run(rules: Rules, rulesDirectory: URL) throws -> [Violation] {
         let files = try fixtureFiles(rules: rules, rulesDirectory: rulesDirectory)
-        return try FixtureCompiler.withWorkDirectory { work in
+        return try WorkDirectory.with { work in
             try incomplete(rules: rules, rulesDirectory: rulesDirectory) + compare(rules: rules, build: build(files, rulesDirectory: rulesDirectory, work: work))
         }
     }

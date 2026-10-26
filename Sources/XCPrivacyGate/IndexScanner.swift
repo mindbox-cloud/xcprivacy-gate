@@ -42,9 +42,9 @@ package struct IndexScanner {
     }
 
     private func read<Result>(_ sources: [URL], root: URL, _ body: (IndexStoreDB, URL) -> Result) throws -> Result {
-        let database = FileManager.default.temporaryDirectory.appending(path: "xcprivacy-gate-index-\(UUID().uuidString)", directoryHint: .isDirectory)
-        defer { try? FileManager.default.removeItem(at: database) }
-        return try scan(sources, root: URL(fileURLWithPath: Self.canonicalPath(of: root), isDirectory: true), database: database, body)
+        try WorkDirectory.with { work in
+            try scan(sources, root: URL(fileURLWithPath: Self.canonicalPath(of: root), isDirectory: true), database: work.appending(path: "database"), body)
+        }
     }
 
     private func scan<Result>(_ sources: [URL], root: URL, database: URL, _ body: (IndexStoreDB, URL) -> Result) throws -> Result {

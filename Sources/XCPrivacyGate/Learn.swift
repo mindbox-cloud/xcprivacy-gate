@@ -53,7 +53,7 @@ package enum Learn {
     private static let baselineName = "learnBaseline"
 
     package static func learn(fixtures: [URL]) throws -> [URL: LearnedNames] {
-        try FixtureCompiler.withWorkDirectory { work in
+        try WorkDirectory.with { work in
             let sources = work.appending(path: "sources", directoryHint: .isDirectory)
             let copies = try fixtures.enumerated().map { position, fixture in
                 let copy = sources.appending(path: "\(position)/\(fixture.lastPathComponent)")

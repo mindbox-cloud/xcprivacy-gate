@@ -37,13 +37,6 @@ struct FixtureCompiler {
         }
     }
 
-    static func withWorkDirectory<Result>(_ body: (URL) throws -> Result) throws -> Result {
-        let directory = FileManager.default.temporaryDirectory.appending(path: "xcprivacy-gate-fixtures-\(UUID().uuidString)", directoryHint: .isDirectory)
-        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
-        defer { try? FileManager.default.removeItem(at: directory) }
-        return try body(directory)
-    }
-
     func compile(_ sources: [URL], into work: URL, index: URL) throws -> [CompiledBatch] {
         try platforms.map { platform in
             let directory = work.appending(path: "\(platform.triple)/objects", directoryHint: .isDirectory)
