@@ -12,6 +12,10 @@ package struct SDKBuild: Sendable {
     func object(of target: String) -> URL {
         products.appending(path: "\(target).o")
     }
+
+    func resourceBundle(of target: String, in package: String) -> URL {
+        products.appending(path: "\(package)_\(target).bundle", directoryHint: .isDirectory)
+    }
 }
 
 package enum PackageBuilder {

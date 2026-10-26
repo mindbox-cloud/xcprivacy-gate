@@ -55,7 +55,8 @@ package enum Refresh {
         let rules = try Rules.load(rulesDirectory.appending(path: RulesFile.fileName))
         let usage = try Usage.load(config.usage, rules: rules, userDefaultsAppGroup: config.userDefaultsAppGroup)
         let package = try PackageReader.read(root: config.packagePath)
-        let declared = declaredReasons(manifests: Gate.manifests(of: package, rules: rules, trackingDisabled: config.trackingDisabled).manifests, usage: usage)
+        let targets = package.targets.map { $0.manifest == nil ? $0.shipping(package.unlistedManifests[$0.name]?.files.first) : $0 }
+        let declared = declaredReasons(manifests: Gate.manifests(of: targets, rules: rules, trackingDisabled: config.trackingDisabled).manifests, usage: usage)
         let changed = try await RulesComparison.conditions(saved: rules.categories, apple: ApplePages.categories(session: session))
         var violations: [Violation] = []
         if let listing = config.appleSdkList, let verdict = SDKList.violation(names: try await ApplePages.sdks(session: session), expected: listing) {

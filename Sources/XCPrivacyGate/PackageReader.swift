@@ -12,12 +12,22 @@ package struct PackageTarget: Sendable {
         self.manifest = manifest
         self.definesDebugInRelease = definesDebugInRelease
     }
+
+    func shipping(_ manifest: URL?) -> PackageTarget {
+        PackageTarget(name: name, sources: sources, manifest: manifest, definesDebugInRelease: definesDebugInRelease)
+    }
+}
+
+package struct UnlistedManifests: Sendable {
+    package let files: [URL]
+    package let atTargetRoot: URL?
 }
 
 package struct PackageDescription: Sendable {
     package let name: String
     package let root: URL
     package let targets: [PackageTarget]
+    package let unlistedManifests: [String: UnlistedManifests]
     package let violations: [Violation]
 }
 
@@ -47,10 +57,13 @@ package enum PackageReader {
             )
         }
         var targets: [PackageTarget] = []
+        var unlistedManifests: [String: UnlistedManifests] = [:]
         for target in package.targets {
             switch target.type {
             case "library":
-                targets.append(target.packageTarget(in: root, definesDebugInRelease: releaseDebugTargets.contains(target.name), violations: &violations))
+                let read = target.packageTarget(in: root, definesDebugInRelease: releaseDebugTargets.contains(target.name), violations: &violations)
+                targets.append(read.target)
+                unlistedManifests[target.name] = read.unlistedManifests
             case "binary":
                 violations.append(Violation(
                     code: "PACKAGE_DEPENDENCY",
@@ -68,6 +81,7 @@ package enum PackageReader {
             name: package.name,
             root: root,
             targets: targets,
+            unlistedManifests: unlistedManifests,
             violations: violations
         )
     }
@@ -153,18 +167,9 @@ private struct DumpedPackage: Decodable {
 }
 
 private extension DescribedPackage.Target {
-    func packageTarget(in root: URL, definesDebugInRelease: Bool, violations: inout [Violation]) -> PackageTarget {
+    func packageTarget(in root: URL, definesDebugInRelease: Bool, violations: inout [Violation]) -> (target: PackageTarget, unlistedManifests: UnlistedManifests?) {
         let directory = root.appendingPathComponent(path, isDirectory: true).standardized
         let declared = resources?.map { URL(fileURLWithPath: $0.path, isDirectory: false) }.first { ManifestValidator.isNamedLikeManifest($0.lastPathComponent) }
-        let onDisk = (try? FileManager.default.contentsOfDirectory(atPath: directory.path))?.first(where: ManifestValidator.isNamedLikeManifest)
-        if declared == nil, let onDisk {
-            violations.append(Violation(
-                code: "MANIFEST_NOT_WIRED",
-                module: name,
-                message: "\(name): \(onDisk) is not shipped as a resource of the target; check the file name's case and the target's resources in Package.swift",
-                file: directory.appendingPathComponent(onDisk).path
-            ))
-        }
         let files = sources.map { directory.appendingPathComponent($0, isDirectory: false) }
         for (source, file) in zip(sources, files) where file.pathExtension != "swift" {
             violations.append(Violation(
@@ -174,11 +179,37 @@ private extension DescribedPackage.Target {
                 file: file.path
             ))
         }
-        return PackageTarget(
+        let target = PackageTarget(
             name: name,
             sources: files.filter { $0.pathExtension == "swift" },
             manifest: declared,
             definesDebugInRelease: definesDebugInRelease
         )
+        let unlisted = declared == nil ? manifests(in: directory) : []
+        guard !unlisted.isEmpty else {
+            return (target, nil)
+        }
+        return (target, UnlistedManifests(files: unlisted, atTargetRoot: unlisted.first { $0.deletingLastPathComponent().path == directory.path }))
+    }
+
+    private func manifests(in directory: URL) -> [URL] {
+        var manifests: [URL] = []
+        var visited: Set<String> = []
+        var pending = [directory]
+        while let next = pending.popLast() {
+            guard visited.insert(next.canonicalPath).inserted, let names = try? FileManager.default.contentsOfDirectory(atPath: next.path) else {
+                continue
+            }
+            for name in names where !name.hasPrefix(".") {
+                let entry = next.appendingPathComponent(name)
+                var isDirectory: ObjCBool = false
+                if ManifestValidator.isNamedLikeManifest(name) {
+                    manifests.append(entry)
+                } else if FileManager.default.fileExists(atPath: entry.path, isDirectory: &isDirectory), isDirectory.boolValue {
+                    pending.append(entry)
+                }
+            }
+        }
+        return manifests.sorted { $0.path < $1.path }
     }
 }

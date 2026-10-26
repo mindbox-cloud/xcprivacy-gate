@@ -24,7 +24,7 @@ Each finding is a GitHub annotation on `file:line` when the gate knows the line.
 ## How it works
 
 `check` builds the package for iOS in release with SwiftPM in a temporary directory, so the checkout stays untouched.
-Three scans then read the result:
+Each target's manifest is the one this build ships in the target's resource bundle. Three scans then read the result:
 
 | Scan | Reads | Finds |
 |---|---|---|
@@ -177,7 +177,7 @@ summary is also appended to the job summary.
 | `OVERRIDE_EXPIRED`, `REGISTRY_UNKNOWN_MODULE`, `REGISTRY_UNKNOWN_REASON` | an entry in `usage.json` is out of date |
 | `MANIFEST_API_ENTRY_KEYS`, `MANIFEST_DATA_ENTRY_KEYS`, `MANIFEST_DUPLICATE_ENTRY`, `MANIFEST_DUPLICATE_KEY`, `MANIFEST_EMPTY_API_TYPES`, `MANIFEST_EMPTY_REASONS`, `MANIFEST_FILE_NAME`, `MANIFEST_MISSING_KEY`, `MANIFEST_REASON_WRONG_CATEGORY`, `MANIFEST_TYPE`, `MANIFEST_UNKNOWN_CATEGORY`, `MANIFEST_UNKNOWN_DATA_TYPE`, `MANIFEST_UNKNOWN_KEY`, `MANIFEST_UNKNOWN_PURPOSE`, `MANIFEST_UNKNOWN_REASON`, `MANIFEST_UNREADABLE` | the manifest is not valid by Apple's rules |
 | `TRACKING_ENABLED`, `TRACKING_DOMAINS` | tracking breaks the `trackingDisabled` policy, or the tracking domains do not match `NSPrivacyTracking` or are not bare host names |
-| `MANIFEST_NOT_WIRED` | a manifest at the target's root is not shipped as a resource: `Package.swift` does not list it, or names it in another case |
+| `MANIFEST_NOT_WIRED` | a manifest at the target's root is not in the resource bundle the build produces: `Package.swift` does not list it (tools-version 6.0 and later ship it unlisted), names it in another case, or excludes it |
 | `PACKAGE_DEPENDENCY`, `UNSCANNABLE_SOURCE` | the package has code the gate cannot read (see [Limitations](#limitations)) |
 | `SDK_ON_APPLE_LIST`, `SDK_OFF_APPLE_LIST` | `refresh --check`: Apple's live SDK list disagrees with `appleSdkList` |
 | `DECLARED_REASON_CHANGED` | `refresh --check`: Apple changed the condition of a reason the SDK declares |

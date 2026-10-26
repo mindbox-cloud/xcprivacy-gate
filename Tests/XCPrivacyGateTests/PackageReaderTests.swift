@@ -80,17 +80,16 @@ struct PackageReaderTests {
         }
     }
 
-    @Test("a manifest on disk that the target's resources do not list is MANIFEST_NOT_WIRED")
-    func unwiredManifestIsReported() throws {
+    @Test("a manifest on disk that the target's resources do not list is an unlisted manifest of the target")
+    func unwiredManifestIsUnlisted() throws {
         try withSampleTree { root in
             var package = fourTargetPackage(root: root)
             package.targets[2].resources = nil
 
             let description = try readPackage(package)
 
-            #expect(codes(description.violations) == ["MANIFEST_NOT_WIRED"])
-            #expect(description.violations.first?.module == "Logger")
-            #expect(description.violations.first?.file == root.appendingPathComponent("Logger/PrivacyInfo.xcprivacy").path)
+            #expect(description.violations.isEmpty)
+            #expect(description.unlistedManifests.mapValues { $0.files.map(\.path) } == ["Logger": [root.appendingPathComponent("Logger/PrivacyInfo.xcprivacy").path]])
             #expect(description.targets.first { $0.name == "Logger" }?.manifest == nil)
         }
     }
@@ -240,18 +239,15 @@ struct PackageReaderTests {
         }
     }
 
-    @Test("a manifest that describe drops because Package.swift names it in another case is MANIFEST_NOT_WIRED naming the file and its case")
-    func manifestDeclaredInAnotherCaseIsNotWired() throws {
+    @Test("a manifest that describe drops because Package.swift names it in another case is an unlisted manifest of the target")
+    func manifestDeclaredInAnotherCaseIsUnlisted() throws {
         let targets = #".target(name: "Swifty", resources: [.process("PrivacyInfo.xcprivacy")])"#
         try withTemporaryDirectory { directory in
             let description = try describeAndRead(targets: targets, files: ["Sources/Swifty/A.swift", "Sources/Swifty/privacyinfo.xcprivacy"], in: directory)
 
             #expect(description.targets.first?.manifest == nil)
-            #expect(codes(description.violations) == ["MANIFEST_NOT_WIRED"])
-            let violation = try #require(description.violations.first)
-            #expect(violation.file == description.root.appendingPathComponent("Sources/Swifty/privacyinfo.xcprivacy").path)
-            #expect(violation.message.contains("privacyinfo.xcprivacy is not shipped as a resource"))
-            #expect(violation.message.contains("case"))
+            #expect(description.violations.isEmpty)
+            #expect(description.unlistedManifests["Swifty"]?.files.map(\.path) == [description.root.appendingPathComponent("Sources/Swifty/privacyinfo.xcprivacy").path])
         }
     }
 
