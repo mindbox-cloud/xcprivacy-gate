@@ -340,6 +340,76 @@ struct ManifestValidatorTests {
         try check(Data(xml.utf8), fileName: fileName, trackingDisabled: trackingDisabled)
     }
 
+    @Test("a manifest violation starts with the module and points at the line of its entry", arguments: [("", 5), ("\n", 6)])
+    func manifestViolationNamesModuleAndLine(prefix: String, line: Int) throws {
+        let xml = prefix + manifestXML(apiTypes: "<array>\n\(apiEntry(category: "UserDefaults"))</array>")
+
+        let violation = try #require(try check(xml).violations.first { $0.code == "MANIFEST_UNKNOWN_CATEGORY" })
+
+        #expect(violation.message.hasPrefix("Core: unknown required-reason category \"UserDefaults\""))
+        #expect(violation.line == line)
+    }
+
+    @Test("an unknown category cites ITMS-91054 and lists Apple's categories")
+    func unknownCategoryListsAppleCategories() throws {
+        let message = try message(of: "MANIFEST_UNKNOWN_CATEGORY", in: manifestXML(apiTypes: "<array>\(apiEntry(category: "NSPrivacyAccessedAPICategoryPhotoLibrary"))</array>"))
+
+        #expect(message == "Core: unknown required-reason category \"NSPrivacyAccessedAPICategoryPhotoLibrary\" (ITMS-91054); Apple's categories are "
+            + rules.categories.keys.sorted().joined(separator: ", "))
+    }
+
+    @Test("a collected data entry without a type is named by its position, and an empty purpose is called an empty string")
+    func collectedDataEntryWithoutTypeIsNamedByPosition() throws {
+        let entry = "<dict><key>NSPrivacyCollectedDataType</key><string></string>"
+            + "<key>NSPrivacyCollectedDataTypeLinked</key><false/><key>NSPrivacyCollectedDataTypeTracking</key><false/>"
+            + "<key>NSPrivacyCollectedDataTypePurposes</key><array><string></string></array></dict>"
+
+        let messages = try check(manifestXML(collected: "<array>\(entry)</array>")).violations.map(\.message)
+
+        #expect(messages == [
+            "Core: collected data entry 1: unknown data type \"\"",
+            "Core: collected data entry 1: NSPrivacyCollectedDataTypePurposes contains an empty string"
+        ])
+    }
+
+    @Test("values in messages are written as property list values")
+    func valuesAreWrittenAsPropertyListValues() throws {
+        let tracked = diagnostics.replacing("<key>NSPrivacyCollectedDataTypeTracking</key><false/>", with: "<key>NSPrivacyCollectedDataTypeTracking</key><true/>")
+
+        #expect(try message(of: "MANIFEST_TYPE", in: manifestXML(tracking: "<string>no</string>")) == "Core: NSPrivacyTracking must be a Boolean, found \"no\"")
+        #expect(try message(of: "TRACKING_ENABLED", in: manifestXML(collected: "<array>\(tracked)</array>"))
+            == "Core: NSPrivacyCollectedDataTypeOtherDiagnosticData: NSPrivacyCollectedDataTypeTracking is true; the SDK must declare false")
+    }
+
+    @Test(
+        "an entry with a missing or an extra key says which, and only a missing key suggests removing the entry",
+        arguments: [
+            (
+                "<dict><key>NSPrivacyAccessedAPIType</key><string>NSPrivacyAccessedAPICategoryUserDefaults</string></dict>",
+                "lacks NSPrivacyAccessedAPITypeReasons. Add NSPrivacyAccessedAPITypeReasons, or remove the entry if the SDK does not use that API (TN3181)"
+            ),
+            (
+                apiEntry().replacing("</dict>", with: "<key>Comment</key><string>x</string></dict>"),
+                "also has Comment. Remove Comment"
+            )
+        ]
+    )
+    func entryKeyProblemIsNamed(entry: String, problem: String) throws {
+        let message = try message(of: "MANIFEST_API_ENTRY_KEYS", in: manifestXML(apiTypes: "<array>\(entry)</array>"))
+
+        #expect(message == "Core: NSPrivacyAccessedAPICategoryUserDefaults must have exactly the keys NSPrivacyAccessedAPIType, NSPrivacyAccessedAPITypeReasons, but it \(problem)")
+    }
+
+    @Test("invisible characters in a value are written as escapes, and an entry whose type has them is named by its position")
+    func invisibleCharactersAreEscaped() throws {
+        let xml = manifestXML(apiTypes: "<array>\(apiEntry(category: "NSPrivacyAccessedAPICategoryUserDefaults\u{200B}", reasons: []))</array>", extra: "<key>NSPrivacyTracking\u{200B}</key><false/>")
+
+        let messages = try check(xml).violations.map(\.message)
+
+        #expect(messages.contains("Core: unknown top-level key \"NSPrivacyTracking\\u{200B}\""))
+        #expect(messages.contains("Core: API entry 1: NSPrivacyAccessedAPITypeReasons is empty"))
+    }
+
     private func check(_ contents: Data, fileName: String = "PrivacyInfo.xcprivacy", trackingDisabled: Bool = true) throws -> (manifest: Manifest?, violations: [Violation]) {
         try withTemporaryDirectory { directory in
             let file = directory.appendingPathComponent(fileName)
