@@ -39,14 +39,38 @@ package enum Report {
         return "::error \(properties.joined(separator: ","))::\(escapeData(violation.message))"
     }
 
+    package static func toolErrorAnnotation(_ message: String) -> String {
+        "::error title=privacy manifest tool error::\(escapeData(message))"
+    }
+
     package static func summary(title: String, violations: [Violation]) -> String {
-        let noun = violations.count == 1 ? "violation" : "violations"
-        let header = "Privacy manifest gate, \(title): \(violations.count) \(noun)"
-        return ([header] + violations.map { "\($0.code) \($0.message)" }).joined(separator: "\n")
+        ([header(title: title, violations: violations)] + violations.map { "\($0.code) \($0.message)" }).joined(separator: "\n")
+    }
+
+    package static func appendStepSummary(title: String, violations: [Violation]) throws {
+        guard let path = ProcessInfo.processInfo.environment["GITHUB_STEP_SUMMARY"], !path.isEmpty else {
+            return
+        }
+        let items = violations.map { "- `\($0.code)` \($0.message)\n" }.joined()
+        let text = "### \(header(title: title, violations: violations))\n\n\(items)\n"
+        let descriptor = open(path, O_WRONLY | O_APPEND | O_CREAT | O_CLOEXEC, 0o644)
+        guard descriptor >= 0 else {
+            throw ToolError(message: "\(path): cannot append the step summary: \(String(cString: strerror(errno)))")
+        }
+        let file = FileHandle(fileDescriptor: descriptor, closeOnDealloc: true)
+        do {
+            try file.write(contentsOf: Data(text.utf8))
+        } catch {
+            throw ToolError(message: "\(path): cannot append the step summary: \(error.localizedDescription)")
+        }
     }
 
     package static func exitCode(violations: [Violation]) -> Int32 {
         violations.isEmpty ? 0 : 1
+    }
+
+    private static func header(title: String, violations: [Violation]) -> String {
+        "Privacy manifest gate, \(title): \(violations.count) \(violations.count == 1 ? "violation" : "violations")"
     }
 
     static func repositoryRelative(_ path: String, root: URL) -> String {

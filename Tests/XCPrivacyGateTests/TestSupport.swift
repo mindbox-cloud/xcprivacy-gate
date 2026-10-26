@@ -35,6 +35,18 @@ func relativeFiles(under directory: URL) throws -> Set<String> {
     return files
 }
 
+func packageManifest(_ package: String) -> String {
+    "// swift-tools-version:5.9\nimport PackageDescription\n\nlet package = \(package)\n"
+}
+
+func writeFiles(_ files: [String: String], to root: URL) throws {
+    for (path, contents) in files {
+        let file = root.appending(path: path)
+        try FileManager.default.createDirectory(at: file.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try Data(contents.utf8).write(to: file)
+    }
+}
+
 func testData(_ path: String) throws -> URL {
     try #require(Bundle.module.url(forResource: "Data", withExtension: nil)).appendingPathComponent(path)
 }

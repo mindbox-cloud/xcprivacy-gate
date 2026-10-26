@@ -8,3 +8,13 @@ enum WorkDirectory {
         return try body(directory)
     }
 }
+
+extension URL {
+    var canonicalPath: String {
+        guard let resolved = realpath(path, nil) else {
+            return path
+        }
+        defer { free(resolved) }
+        return String(cString: resolved)
+    }
+}

@@ -43,7 +43,7 @@ package struct IndexScanner {
 
     private func read<Result>(_ sources: [URL], root: URL, _ body: (IndexStoreDB, URL) -> Result) throws -> Result {
         try WorkDirectory.with { work in
-            try scan(sources, root: URL(fileURLWithPath: Self.canonicalPath(of: root), isDirectory: true), database: work.appending(path: "database"), body)
+            try scan(sources, root: URL(fileURLWithPath: root.canonicalPath, isDirectory: true), database: work.appending(path: "database"), body)
         }
     }
 
@@ -89,15 +89,7 @@ package struct IndexScanner {
     }
 
     private static func repositoryPath(of source: URL, root: URL) -> String {
-        Report.repositoryRelative(canonicalPath(of: source), root: root)
-    }
-
-    private static func canonicalPath(of url: URL) -> String {
-        guard let resolved = realpath(url.path, nil) else {
-            return url.path
-        }
-        defer { free(resolved) }
-        return String(cString: resolved)
+        Report.repositoryRelative(source.canonicalPath, root: root)
     }
 }
 

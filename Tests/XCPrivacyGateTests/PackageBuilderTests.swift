@@ -3,12 +3,8 @@ import Testing
 import XCPrivacyGate
 import XCPrivacyGateRules
 
-private func manifest(_ package: String) -> String {
-    "// swift-tools-version:5.9\nimport PackageDescription\n\nlet package = \(package)\n"
-}
-
 private let sampleFiles = [
-    "Package.swift": manifest("""
+    "Package.swift": packageManifest("""
         Package(
             name: "Sample",
             platforms: [.iOS(.v15)],
@@ -55,22 +51,14 @@ private let sampleFiles = [
 
 private func oneTargetFiles(_ source: String) -> [String: String] {
     [
-        "Package.swift": manifest(#"Package(name: "Sample", platforms: [.iOS(.v15)], targets: [.target(name: "Core")])"#),
+        "Package.swift": packageManifest(#"Package(name: "Sample", platforms: [.iOS(.v15)], targets: [.target(name: "Core")])"#),
         "Sources/Core/Core.swift": source
     ]
 }
 
-private func write(_ files: [String: String], to root: URL) throws {
-    for (path, contents) in files {
-        let file = root.appending(path: path)
-        try FileManager.default.createDirectory(at: file.deletingLastPathComponent(), withIntermediateDirectories: true)
-        try Data(contents.utf8).write(to: file)
-    }
-}
-
 private func taggedDependency(at root: URL) throws -> URL {
-    try write([
-        "Package.swift": manifest(#"Package(name: "Dep", products: [.library(name: "Dep", targets: ["Dep"])], targets: [.target(name: "Dep")])"#),
+    try writeFiles([
+        "Package.swift": packageManifest(#"Package(name: "Dep", products: [.library(name: "Dep", targets: ["Dep"])], targets: [.target(name: "Dep")])"#),
         "Sources/Dep/Dep.swift": "public let dep = 1\n"
     ], to: root)
     let git = ["git", "-C", root.path, "-c", "user.name=Sample", "-c", "user.email=sample@example.com", "-c", "commit.gpgSign=false", "-c", "tag.gpgSign=false"]
@@ -82,7 +70,7 @@ private func taggedDependency(at root: URL) throws -> URL {
 
 private func dependentFiles(on dependency: URL) -> [String: String] {
     [
-        "Package.swift": manifest("""
+        "Package.swift": packageManifest("""
             Package(
                 name: "Sample",
                 platforms: [.iOS(.v15)],
@@ -99,7 +87,7 @@ private struct SamplePackage: Sendable {
     let targets: [PackageTarget]
 
     init(at root: URL, files: [String: String]) throws {
-        try write(files, to: root)
+        try writeFiles(files, to: root)
         self.root = root
         targets = Set(files.keys.filter { $0.hasPrefix("Sources/") && $0.hasSuffix(".swift") }.map { $0.split(separator: "/")[1] })
             .sorted()
@@ -199,7 +187,7 @@ struct PackageBuilderTests {
     func macOSOnlyExecutableTargetIsNotBuilt() throws {
         try withTemporaryDirectory { directory in
             let package = try SamplePackage(at: canonical(directory).appending(path: "Sample"), files: [
-                "Package.swift": manifest(#"Package(name: "Sample", platforms: [.iOS(.v15)], targets: [.target(name: "Core"), .executableTarget(name: "Tool")])"#),
+                "Package.swift": packageManifest(#"Package(name: "Sample", platforms: [.iOS(.v15)], targets: [.target(name: "Core"), .executableTarget(name: "Tool")])"#),
                 "Sources/Core/Core.swift": "public let answer = 42\n",
                 "Sources/Tool/main.swift": "import Foundation\n\nlet process = Process()\nprocess.executableURL = URL(fileURLWithPath: \"/usr/bin/true\")\ntry process.run()\n"
             ])

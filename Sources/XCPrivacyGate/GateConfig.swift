@@ -3,6 +3,7 @@ import Foundation
 package struct GateConfig: Equatable, Sendable {
     package let usage: URL
     package let packagePath: URL
+    package let repositoryRoot: URL
     package let userDefaultsAppGroup: Bool
     package let trackingDisabled: Bool
 
@@ -18,9 +19,13 @@ package struct GateConfig: Equatable, Sendable {
     private init(file: URL) throws {
         let raw = try RawConfig(contentsOf: file)
         let directory = file.deletingLastPathComponent()
+        let repository = Self.directoryHoldingGithub(above: directory)
+        guard let packagePath = raw.packagePath.map({ Self.resolve($0, against: directory, isDirectory: true) }) ?? repository else {
+            throw ToolError(message: "key \"packagePath\" is absent and the config is not under a .github directory")
+        }
         usage = Self.resolve(raw.usage, against: directory, isDirectory: false)
-        packagePath = try raw.packagePath.map { Self.resolve($0, against: directory, isDirectory: true) }
-            ?? Self.repositoryRoot(above: directory)
+        self.packagePath = packagePath
+        repositoryRoot = URL(fileURLWithPath: (repository ?? packagePath).canonicalPath, isDirectory: true)
         userDefaultsAppGroup = raw.policy.userDefaultsAppGroup
         trackingDisabled = raw.policy.trackingDisabled
     }
@@ -29,10 +34,10 @@ package struct GateConfig: Equatable, Sendable {
         URL(fileURLWithPath: path, isDirectory: isDirectory, relativeTo: directory).standardizedFileURL
     }
 
-    private static func repositoryRoot(above directory: URL) throws -> URL {
+    private static func directoryHoldingGithub(above directory: URL) -> URL? {
         let components = directory.pathComponents
         guard let index = components.lastIndex(of: ".github") else {
-            throw ToolError(message: "key \"packagePath\" is absent and the config is not under a .github directory")
+            return nil
         }
         return URL(fileURLWithPath: NSString.path(withComponents: Array(components[..<index])), isDirectory: true)
     }

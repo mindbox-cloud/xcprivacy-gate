@@ -1,0 +1,36 @@
+import Foundation
+
+package enum Gate {
+    package static func check(config: GateConfig, rules: Rules, today: Date) throws -> (title: String, violations: [Violation]) {
+        let usage = try Usage.load(config.usage, rules: rules, userDefaultsAppGroup: config.userDefaultsAppGroup)
+        let package = try PackageReader.read(description: PackageReader.describe(root: config.packagePath), dump: PackageReader.dump(root: config.packagePath))
+        var violations = package.violations
+        var manifests: [String: Manifest] = [:]
+        for target in package.targets {
+            guard let file = target.manifest else { continue }
+            let (manifest, found) = ManifestValidator.parse(file, module: target.name, rules: rules, trackingDisabled: config.trackingDisabled)
+            manifests[target.name] = manifest
+            violations += found
+        }
+        let use = try WorkDirectory.with { work in
+            try scan(package, rules: rules, usage: usage, root: config.repositoryRoot, work: work)
+        }
+        let policy = Policy(usage: usage, rules: rules, userDefaultsAppGroup: config.userDefaultsAppGroup, today: today)
+        violations += policy.evaluate(targets: package.targets, source: use.source, binary: use.binary, manifests: manifests)
+        return (title: "check of \(package.name)", violations: violations)
+    }
+
+    private static func scan(
+        _ package: PackageDescription,
+        rules: Rules,
+        usage: Usage,
+        root: URL,
+        work: URL
+    ) throws -> (source: [String: ModuleFindings], binary: [String: ModuleFindings]) {
+        let build = try PackageBuilder.build(root: package.root, targets: package.targets, work: work)
+        let index = try IndexScanner(store: build.indexStore).findings(targets: package.targets, rules: rules, root: root)
+        let strings = try StringLiterals.findings(targets: package.targets, rules: rules, usage: usage, root: root)
+        let binary = try BinaryScanner.findings(build: build, targets: package.targets, rules: rules, usage: usage)
+        return (source: strings.merging(index) { $0.merging($1) }, binary: binary)
+    }
+}
