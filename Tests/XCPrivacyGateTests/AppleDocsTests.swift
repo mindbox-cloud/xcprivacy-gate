@@ -64,6 +64,32 @@ struct AppleDocsTests {
         #expect(try #require(error).message.contains("possibleValues"))
     }
 
+    @Test("a reason definition keeps the text of a paragraph and of an unordered list after it")
+    func definitionKeepsParagraphAndListText() throws {
+        let original = try #require(AppleDocs.requiredReasons(applePage(Self.requiredReasonPage))[Self.activeKeyboards]?.reasons["3EC4.1"])
+        let page = try mutablePage(Self.requiredReasonPage)
+        try definitionContent(of: page, Self.activeKeyboards, "3EC4.1")
+            .add(["type": "unorderedList", "items": [["content": [["type": "paragraph", "inlineContent": [["type": "text", "text": "Only for keyboards."]]]]]]])
+
+        let text = try #require(AppleDocs.requiredReasons(swiftPage(page))[Self.activeKeyboards]?.reasons["3EC4.1"])
+
+        #expect(text.hasPrefix(original))
+        #expect(text.hasSuffix("Only for keyboards."))
+    }
+
+    @Test("an unknown block in a reason definition is a tool error naming the category and the reason")
+    func unknownDefinitionBlockIsAnError() throws {
+        let page = try mutablePage(Self.requiredReasonPage)
+        try definitionContent(of: page, Self.activeKeyboards, "3EC4.1").add(["type": "video", "identifier": "x"])
+
+        let error = #expect(throws: ToolError.self) { try AppleDocs.requiredReasons(swiftPage(page)) }
+
+        let message = try #require(error).message
+        #expect(message.contains(Self.activeKeyboards))
+        #expect(message.contains("3EC4.1"))
+        #expect(message.contains("\"video\""))
+    }
+
     @Test("collected data types are read from the saved page")
     func readsCollectedDataTypes() throws {
         let names = try AppleDocs.possibleValueNames(applePage("nsprivacycollecteddatatype-2026-10-25.json"))
@@ -121,6 +147,17 @@ struct AppleDocsTests {
     private func element(of parent: NSDictionary, _ key: String, where field: String, is value: String) throws -> NSMutableDictionary {
         let children = try #require(parent[key] as? NSArray)
         return try #require(children.lazy.compactMap { $0 as? NSMutableDictionary }.first { $0[field] as? String == value })
+    }
+
+    private func definitionContent(of page: NSDictionary, _ category: String, _ code: String) throws -> NSMutableArray {
+        let possibleValues = try element(of: page, "primaryContentSections", where: "kind", is: "possibleValues")
+        let value = try #require((possibleValues["values"] as? NSArray)?.lazy.compactMap { $0 as? NSDictionary }.first { $0["name"] as? String == category })
+        let reasons = try element(of: value, "content", where: "type", is: "termList")
+        let item = try #require((reasons["items"] as? NSArray)?.lazy.compactMap { $0 as? NSDictionary }.first { item in
+            let term = (item["term"] as? NSDictionary)?["inlineContent"] as? NSArray
+            return (term?.firstObject as? NSDictionary)?["code"] as? String == code
+        })
+        return try #require((item["definition"] as? NSDictionary)?["content"] as? NSMutableArray)
     }
 
     private func swiftPage(_ page: NSDictionary) throws -> [String: Any] {
