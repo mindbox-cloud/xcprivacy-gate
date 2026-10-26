@@ -73,4 +73,65 @@ struct ShippedBuildLane: BuildConfiguration {
     }
 }
 
+extension ShippedBuildLane {
+    private static let versionCheckLimit = 8
+
+    func reachedClauses(of node: IfConfigDeclSyntax) -> [IfConfigClauseSyntax] {
+        var reached: [IfConfigClauseSyntax] = []
+        for clause in node.clauses {
+            guard let condition = clause.condition else {
+                return reached + [clause]
+            }
+            guard let outcomes = outcomes(of: condition) else {
+                return Array(node.clauses)
+            }
+            if outcomes.contains(true) {
+                reached.append(clause)
+            }
+            if !outcomes.contains(false) {
+                return reached
+            }
+        }
+        return reached
+    }
+
+    private func outcomes(of condition: ExprSyntax) -> Set<Bool>? {
+        let probe = VersionCheckReplacer(assignment: 0)
+        let first = probe.visit(condition.detached)
+        guard probe.replaced <= Self.versionCheckLimit else {
+            return nil
+        }
+        let decided = [first] + (1..<(1 << probe.replaced)).map { VersionCheckReplacer(assignment: $0).visit(condition.detached) }
+        var outcomes: Set<Bool> = []
+        for condition in decided {
+            let evaluation = IfConfigRegionState.evaluating(condition, in: self)
+            guard evaluation.diagnostics.isEmpty else {
+                return nil
+            }
+            outcomes.insert(evaluation.state == .active)
+        }
+        return outcomes
+    }
+}
+
+private final class VersionCheckReplacer: SyntaxRewriter {
+    private static let versionChecks: Set = ["swift", "compiler", "_compiler_version"]
+
+    private let assignment: Int
+    private(set) var replaced = 0
+
+    init(assignment: Int) {
+        self.assignment = assignment
+        super.init(viewMode: .sourceAccurate)
+    }
+
+    override func visit(_ node: FunctionCallExprSyntax) -> ExprSyntax {
+        guard let callee = node.calledExpression.as(DeclReferenceExprSyntax.self), Self.versionChecks.contains(callee.baseName.text) else {
+            return super.visit(node)
+        }
+        defer { replaced += 1 }
+        return ExprSyntax(BooleanLiteralExprSyntax(literal: .keyword((assignment >> replaced) & 1 == 1 ? .true : .false)))
+    }
+}
+
 private struct UndecidedCondition: Error {}

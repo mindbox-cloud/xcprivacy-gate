@@ -63,10 +63,9 @@ private final class LiteralCollector: SyntaxVisitor {
 
     override func visit(_ node: IfConfigDeclSyntax) -> SyntaxVisitorContinueKind {
         let reaching = lanes
-        let checksVersion = VersionCheckFinder.checksVersion(node)
         var lanesByClause: [IfConfigClauseSyntax: [ShippedBuildLane]] = [:]
         for lane in reaching {
-            for clause in Self.clauses(of: node, reachedBy: lane, keepingEvery: checksVersion) {
+            for clause in lane.reachedClauses(of: node) {
                 lanesByClause[clause, default: []].append(lane)
             }
         }
@@ -77,33 +76,5 @@ private final class LiteralCollector: SyntaxVisitor {
         }
         lanes = reaching
         return .skipChildren
-    }
-
-    private static func clauses(of node: IfConfigDeclSyntax, reachedBy lane: ShippedBuildLane, keepingEvery: Bool) -> [IfConfigClauseSyntax] {
-        guard !keepingEvery else { return Array(node.clauses) }
-        let outcome = node.activeClause(in: lane)
-        guard outcome.diagnostics.isEmpty else { return Array(node.clauses) }
-        return outcome.clause.map { [$0] } ?? []
-    }
-}
-
-private final class VersionCheckFinder: SyntaxVisitor {
-    private static let versionChecks: Set = ["swift", "compiler", "_compiler_version"]
-
-    private var found = false
-
-    static func checksVersion(_ node: IfConfigDeclSyntax) -> Bool {
-        let finder = VersionCheckFinder(viewMode: .sourceAccurate)
-        for condition in node.clauses.compactMap(\.condition) {
-            finder.walk(condition)
-        }
-        return finder.found
-    }
-
-    override func visit(_ node: FunctionCallExprSyntax) -> SyntaxVisitorContinueKind {
-        if let callee = node.calledExpression.as(DeclReferenceExprSyntax.self), Self.versionChecks.contains(callee.baseName.text) {
-            found = true
-        }
-        return .visitChildren
     }
 }

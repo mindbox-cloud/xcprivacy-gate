@@ -174,8 +174,8 @@ struct StringLiteralsTests {
         #expect(branchLiterals("compiler(>=6.0) && compiler(<7.0)") == [ifBranch, elseBranch])
     }
 
-    @Test("an #elseif chain with a swift version check keeps every clause")
-    func elseIfChainWithSwiftVersionKeepsEveryClause() {
+    @Test("an #elseif swift(>=5.9) after os(macOS) keeps the version clause and the #else and drops the macOS clause")
+    func elseIfChainWithSwiftVersionKeepsReachedClauses() {
         #expect(literals(
             "#if os(macOS)",
             #"let a = "NSFileCreationDate""#,
@@ -185,7 +185,6 @@ struct StringLiteralsTests {
             #"let c = "NSFileSystemFreeSize""#,
             "#endif"
         ) == [
-            Literal(value: "NSFileCreationDate", line: 2),
             Literal(value: "NSFileSystemSize", line: 4),
             Literal(value: "NSFileSystemFreeSize", line: 6)
         ])
