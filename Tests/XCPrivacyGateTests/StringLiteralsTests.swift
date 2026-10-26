@@ -169,6 +169,41 @@ struct StringLiteralsTests {
         #expect(branchLiterals(condition) == [ifBranch, elseBranch])
     }
 
+    @Test("a bounded compiler version range keeps both branches")
+    func boundedCompilerRangeKeepsBothBranches() {
+        #expect(branchLiterals("compiler(>=6.0) && compiler(<7.0)") == [ifBranch, elseBranch])
+    }
+
+    @Test("an #elseif chain with a swift version check keeps every clause")
+    func elseIfChainWithSwiftVersionKeepsEveryClause() {
+        #expect(literals(
+            "#if os(macOS)",
+            #"let a = "NSFileCreationDate""#,
+            "#elseif swift(>=5.9)",
+            #"let b = "NSFileSystemSize""#,
+            "#else",
+            #"let c = "NSFileSystemFreeSize""#,
+            "#endif"
+        ) == [
+            Literal(value: "NSFileCreationDate", line: 2),
+            Literal(value: "NSFileSystemSize", line: 4),
+            Literal(value: "NSFileSystemFreeSize", line: 6)
+        ])
+    }
+
+    @Test("an os(macOS) clause without a version check is still skipped inside an #if that checks one")
+    func macOSClauseInsideVersionCheckIsSkipped() {
+        #expect(literals(
+            "#if compiler(>=6.0)",
+            "#if os(macOS)",
+            #"let a = "NSFileCreationDate""#,
+            "#else",
+            #"let b = "NSFileSystemSize""#,
+            "#endif",
+            "#endif"
+        ) == [Literal(value: "NSFileSystemSize", line: 5)])
+    }
+
     @Test("an #elseif chain keeps the clauses some shipped build reaches")
     func elseIfChainKeepsReachedClauses() {
         #expect(literals(
