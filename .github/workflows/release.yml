@@ -63,5 +63,5 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          rules_changed=$(git log -1 --format=%cs -- Rules)
+          rules_changed=$(git log -1 --format=%cs -- Rules/rules.json Rules/apple)
           gh release create "v$VERSION" --verify-tag --generate-notes --notes "Apple rules last changed $rules_changed"
