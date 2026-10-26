@@ -1,0 +1,382 @@
+import Foundation
+import Testing
+import XCPrivacyGate
+import XCPrivacyGateRules
+
+private let bootTime = "NSPrivacyAccessedAPICategorySystemBootTime"
+private let userDefaults = "NSPrivacyAccessedAPICategoryUserDefaults"
+private let clock = "import Darwin\n\npublic func now() -> UInt64 { mach_absolute_time() }\n"
+private let libPackage = packageManifest(
+    #"Package(name: "Sample", platforms: [.iOS(.v15)], targets: [.target(name: "Lib", path: "Lib", resources: [.process("PrivacyInfo.xcprivacy")])])"#
+)
+
+private func privacyManifest(_ reasons: [String: String]) -> String {
+    let entries = reasons.sorted { $0.key < $1.key }.map { category, reason in
+        "<dict><key>NSPrivacyAccessedAPIType</key><string>\(category)</string>"
+            + "<key>NSPrivacyAccessedAPITypeReasons</key><array><string>\(reason)</string></array></dict>"
+    }
+    return #"<?xml version="1.0" encoding="UTF-8"?>"# + "\n"
+        + "<plist version=\"1.0\"><dict><key>NSPrivacyTracking</key><false/><key>NSPrivacyAccessedAPITypes</key><array>\(entries.joined())</array></dict></plist>\n"
+}
+
+private let emptyManifest = #"<?xml version="1.0" encoding="UTF-8"?>"# + "\n"
+    + "<plist version=\"1.0\"><dict><key>NSPrivacyTracking</key><false/></dict></plist>\n"
+
+private let trackingManifest = #"<?xml version="1.0" encoding="UTF-8"?>"# + "\n"
+    + "<plist version=\"1.0\"><dict><key>NSPrivacyTracking</key><true/>"
+    + "<key>NSPrivacyTrackingDomains</key><array><string>tracker.example.com</string></array></dict></plist>\n"
+
+private func bootTimeCall(_ api: String, in file: String) -> [String: String] {
+    ["module": "Lib", "file": file, "api": api, "reason": "35F9.1", "purpose": "Measure elapsed time"]
+}
+
+private func check(_ configFile: URL) throws -> (config: GateConfig, title: String, violations: [Violation]) {
+    let config = try GateConfig.load(configFile)
+    let result = try Gate.check(
+        config: config,
+        rules: Rules.load(RulesBundle.directory.appending(path: "rules.json")),
+        today: Date()
+    )
+    return (config, result.title, result.violations)
+}
+
+private func text(_ bytes: [UInt8]) throws -> String {
+    try #require(String(bytes: bytes, encoding: .utf8))
+}
+
+@Suite("Check")
+struct GateTests {
+    @Test("check exits 1 with one annotation per violation, a summary and a step summary appended to the file")
+    func violationsExitOne() async throws {
+        let root = try makeTemporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let config = try makeGateRepository(at: root, try gateFiles().merging([
+            "Package.swift": libPackage,
+            "Lib/Clock.swift": clock,
+            "Lib/PrivacyInfo.xcprivacy": String(contentsOf: testData("manifests/Logger.xcprivacy"), encoding: .utf8)
+        ]) { $1 })
+        let summary = root.appending(path: "step-summary.md")
+        try Data("previous step\n".utf8).write(to: summary)
+        let arguments = ["check", "--config", config.path]
+
+        let result = try await #require(processExitsWith: .exitCode(1), observing: [\.standardOutputContent]) { [arguments = arguments as [String], summary = summary.path as String?] in
+            await runCommand(arguments, stepSummary: summary)
+        }
+
+        let output = try text(result.standardOutputContent)
+        let annotations = output.split(separator: "\n").filter { $0.hasPrefix("::error ") }.map { $0.components(separatedBy: "::")[1] }
+        #expect(annotations == [
+            "error file=Lib/PrivacyInfo.xcprivacy,line=39,title=EXTRA_CATEGORY",
+            "error file=Lib/PrivacyInfo.xcprivacy,title=MISSING_CATEGORY",
+            "error file=Lib/Clock.swift,line=3,title=UNREGISTERED_CALL"
+        ])
+        let report = try #require(output.range(of: "Privacy manifest gate").map { output[$0.lowerBound...] })
+        #expect(report.hasPrefix("Privacy manifest gate, check of Sample: 3 violations\n"))
+        #expect(report.contains("MISSING_CATEGORY Lib: "))
+        #expect(report.contains(bootTime))
+        let step = try String(contentsOf: summary, encoding: .utf8)
+        #expect(step.hasPrefix("previous step\n### Privacy manifest gate, check of Sample: 3 violations\n\n- `EXTRA_CATEGORY` Lib: "))
+        #expect(step.split(separator: "\n").filter { $0.hasPrefix("- `") }.count == 3)
+        #expect(step.hasSuffix("/nsprivacyaccessedapitypes/nsprivacyaccessedapitype\n\n"))
+    }
+
+    @Test("check exits 0 with only the summary when the manifest and usage.json match the code")
+    func matchingManifestExitsZero() async throws {
+        let root = try makeTemporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let config = try makeGateRepository(at: root, try gateFiles(calls: [bootTimeCall("mach_absolute_time", in: "Lib/Clock.swift")]).merging([
+            "Package.swift": libPackage,
+            "Lib/Clock.swift": clock,
+            "Lib/PrivacyInfo.xcprivacy": privacyManifest([bootTime: "35F9.1"])
+        ]) { $1 })
+        let arguments = ["check", "--config", config.path]
+
+        let result = try await #require(processExitsWith: .success, observing: [\.standardOutputContent]) { [arguments = arguments as [String]] in
+            await runCommand(arguments, stepSummary: nil)
+        }
+
+        #expect(try text(result.standardOutputContent) == "Privacy manifest gate, check of Sample: 0 violations\n")
+    }
+
+    @Test("a broken usage.json is a tool error naming the file, on stderr and as an annotation")
+    func brokenUsageIsToolError() async throws {
+        let root = try makeTemporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: root) }
+        var files = try gateFiles().merging(["Package.swift": libPackage, "Lib/Clock.swift": clock]) { $1 }
+        files[".github/privacy-manifest/usage.json"] = "{"
+        let arguments = ["check", "--config", try makeGateRepository(at: root, files).path]
+
+        let result = try await #require(processExitsWith: .exitCode(2), observing: [\.standardOutputContent, \.standardErrorContent]) { [arguments = arguments as [String]] in
+            await runCommand(arguments, stepSummary: nil)
+        }
+
+        #expect(try text(result.standardErrorContent).contains("usage.json: not valid JSON"))
+        let annotation = try text(result.standardOutputContent)
+        #expect(annotation.hasPrefix("::error title=privacy manifest tool error::/"))
+        #expect(annotation.hasSuffix("/.github/privacy-manifest/usage.json: not valid JSON\n"))
+    }
+
+    @Test("an unknown argument exits 2")
+    func unknownArgumentExitsTwo() async throws {
+        let result = try await #require(processExitsWith: .exitCode(2), observing: [\.standardOutputContent, \.standardErrorContent]) {
+            await runCommand(["check", "--config", "config.json", "--lanes", "source"], stepSummary: nil)
+        }
+
+        #expect(try text(result.standardErrorContent).contains("Unknown option '--lanes'"))
+        #expect(try text(result.standardOutputContent) == "::error title=privacy manifest tool error::Unknown option '--lanes'\n")
+    }
+
+    @Test("the bare command without a subcommand exits 2 and says a subcommand is required")
+    func bareCommandExitsTwo() async throws {
+        let result = try await #require(processExitsWith: .exitCode(2), observing: [\.standardErrorContent]) {
+            await runCommand([], stepSummary: nil)
+        }
+
+        #expect(try text(result.standardErrorContent).hasPrefix("Error: a subcommand is required\n"))
+    }
+
+    @Test("--help exits 0 with the overview")
+    func helpExitsZero() async throws {
+        let result = try await #require(processExitsWith: .success, observing: [\.standardOutputContent]) {
+            await runCommand(["--help"], stepSummary: nil)
+        }
+
+        #expect(try text(result.standardOutputContent).hasPrefix("OVERVIEW: "))
+    }
+
+    @Test("--version exits 0 and prints the tool version")
+    func versionExitsZero() async throws {
+        let result = try await #require(processExitsWith: .success, observing: [\.standardOutputContent]) {
+            await runCommand(["--version"], stepSummary: nil)
+        }
+
+        #expect(try text(result.standardOutputContent) == "\(ToolVersion.current)\n")
+    }
+
+    @Test("a package with an Objective-C target fails with UNSCANNABLE_SOURCE, and package and manifest violations come before the policy ones")
+    func objectiveCTargetIsUnscannable() throws {
+        try withTemporaryDirectory { root in
+            let configFile = try makeGateRepository(at: root, try gateFiles().merging([
+                "Package.swift": packageManifest("""
+                    Package(
+                        name: "Sample",
+                        platforms: [.iOS(.v15)],
+                        targets: [
+                            .target(name: "Core", path: "Core", resources: [.process("PrivacyInfo.xcprivacy")]),
+                            .target(name: "Lib", path: "Lib")
+                        ]
+                    )
+                    """),
+                "Core/Clock.swift": clock,
+                "Core/PrivacyInfo.xcprivacy": privacyManifest([bootTime: "35F9.1", "NSPrivacyAccessedAPICategoryUnknown": "35F9.1"]),
+                "Lib/Legacy.m": "#import \"Legacy.h\"\n\nint legacyAnswer(void) { return 42; }\n",
+                "Lib/include/Legacy.h": "int legacyAnswer(void);\n"
+            ]) { $1 })
+
+            let (config, title, violations) = try check(configFile)
+
+            #expect(title == "check of Sample")
+            #expect(violations.map(\.code) == ["UNSCANNABLE_SOURCE", "MANIFEST_UNKNOWN_CATEGORY", "UNREGISTERED_CALL"])
+            #expect(violations.first.map { Report.annotation($0, root: config.repositoryRoot) }
+                == "::error file=Lib/Legacy.m,title=UNSCANNABLE_SOURCE::Lib: Legacy.m is not Swift; the source scan cannot read it")
+            #expect(violations.last?.file == "Core/Clock.swift")
+            #expect(violations.last?.line == 3)
+        }
+    }
+
+    @Test(
+        "check leaves appleSdkList to refresh --check, whatever the bundled Apple list says",
+        arguments: [("Alamofire", false), ("Sample", true)]
+    )
+    func checkLeavesAppleSdkListToRefresh(name: String, listed: Bool) throws {
+        try withTemporaryDirectory { root in
+            let configFile = try makeGateRepository(at: root, try gateFiles(appleSdkList: ["name": name, "listed": listed]).merging([
+                "Package.swift": libPackage,
+                "Lib/Clock.swift": clock,
+                "Lib/PrivacyInfo.xcprivacy": privacyManifest([bootTime: "35F9.1"])
+            ]) { $1 })
+
+            #expect(try check(configFile).violations.map(\.code) == ["UNREGISTERED_CALL"])
+        }
+    }
+
+    @Test(
+        "a manifest that tools-version 6 ships without a resources entry is the target's manifest, at the target root and in a subdirectory",
+        arguments: ["PrivacyInfo.xcprivacy", "Resources/PrivacyInfo.xcprivacy"]
+    )
+    func manifestShippedWithoutResourcesEntryIsChecked(file: String) throws {
+        try withTemporaryDirectory { root in
+            let configFile = try makeGateRepository(at: root, try gateFiles(calls: [bootTimeCall("mach_absolute_time", in: "Lib/Clock.swift")]).merging([
+                "Package.swift": packageManifest(
+                    #"Package(name: "Sample", platforms: [.iOS(.v15)], targets: [.target(name: "Lib", path: "Lib")])"#,
+                    toolsVersion: "6.0"
+                ),
+                "Lib/Clock.swift": clock,
+                "Lib/\(file)": privacyManifest([bootTime: "35F9.1"])
+            ]) { $1 })
+
+            #expect(try check(configFile).violations.map(\.code) == [])
+        }
+    }
+
+    @Test(
+        "a manifest at the target root that the build does not ship is MANIFEST_NOT_WIRED, unlisted and named in another case",
+        arguments: [
+            ("PrivacyInfo.xcprivacy", ""),
+            ("privacyinfo.xcprivacy", #", resources: [.process("PrivacyInfo.xcprivacy")]"#)
+        ]
+    )
+    func manifestTheBuildDoesNotShipIsNotWired(file: String, resources: String) throws {
+        try withTemporaryDirectory { root in
+            let configFile = try makeGateRepository(at: root, try gateFiles().merging([
+                "Package.swift": packageManifest(
+                    #"Package(name: "Sample", platforms: [.iOS(.v15)], targets: [.target(name: "Lib", path: "Lib"\#(resources))])"#
+                ),
+                "Lib/Answer.swift": "public let answer = 42\n",
+                "Lib/\(file)": privacyManifest([:])
+            ]) { $1 })
+
+            let (config, _, violations) = try check(configFile)
+
+            #expect(violations.map(\.code) == ["MANIFEST_NOT_WIRED"])
+            #expect(violations.first.map { Report.annotation($0, root: config.repositoryRoot) }
+                == "::error file=Lib/\(file),title=MANIFEST_NOT_WIRED::Lib: Lib/\(file) is not shipped as a resource of the target; "
+                + "check the file name's case and the target's resources in Package.swift")
+        }
+    }
+
+    @Test(
+        "a manifest that tools-version 6 ships through a symlink is the target's manifest, as a linked file and in a linked directory",
+        arguments: [("Lib/PrivacyInfo.xcprivacy", "../Shared/PrivacyInfo.xcprivacy"), ("Lib/Resources", "../Shared")]
+    )
+    func manifestShippedThroughSymlinkIsChecked(link: String, destination: String) throws {
+        try withTemporaryDirectory { root in
+            let configFile = try makeGateRepository(at: root, try gateFiles(calls: [bootTimeCall("mach_absolute_time", in: "Lib/Clock.swift")]).merging([
+                "Package.swift": packageManifest(
+                    #"Package(name: "Sample", platforms: [.iOS(.v15)], targets: [.target(name: "Lib", path: "Lib")])"#,
+                    toolsVersion: "6.0"
+                ),
+                "Lib/Clock.swift": clock,
+                "Shared/PrivacyInfo.xcprivacy": privacyManifest([bootTime: "35F9.1"])
+            ]) { $1 })
+            try FileManager.default.createSymbolicLink(atPath: root.appending(path: link).path, withDestinationPath: destination)
+
+            #expect(try check(configFile).violations.map(\.code) == [])
+        }
+    }
+
+    @Test("a manifest of a target nested in another target's directory is not MANIFEST_NOT_WIRED for the outer target")
+    func nestedTargetsManifestIsNotTheOuterTargets() throws {
+        try withTemporaryDirectory { root in
+            let configFile = try makeGateRepository(at: root, try gateFiles().merging([
+                "Package.swift": packageManifest("""
+                    Package(
+                        name: "Sample",
+                        platforms: [.iOS(.v15)],
+                        targets: [
+                            .target(name: "Core", path: "Sources", exclude: ["Ext"]),
+                            .target(name: "Ext", path: "Sources/Ext", resources: [.process("PrivacyInfo.xcprivacy")])
+                        ]
+                    )
+                    """),
+                "Sources/Core.swift": "public let core = 1\n",
+                "Sources/Ext/Ext.swift": "public let ext = 1\n",
+                "Sources/Ext/PrivacyInfo.xcprivacy": emptyManifest
+            ]) { $1 })
+
+            #expect(try check(configFile).violations.map(\.code) == [])
+        }
+    }
+
+    @Test(
+        "check validates a manifest whatever the case of its file name and reports a name other than PrivacyInfo.xcprivacy",
+        arguments: [
+            ("PrivacyInfo.xcprivacy", "PrivacyInfo.xcprivacy", ["TRACKING_ENABLED"]),
+            ("privacyinfo.xcprivacy", "privacyinfo.xcprivacy", ["MANIFEST_FILE_NAME", "TRACKING_ENABLED"]),
+            ("Resources", "Resources/privacyinfo.xcprivacy", ["MANIFEST_FILE_NAME", "TRACKING_ENABLED"])
+        ] as [(String, String, [String])]
+    )
+    func manifestOfAnyNameCaseIsValidated(resource: String, file: String, codes: [String]) throws {
+        try withTemporaryDirectory { root in
+            let configFile = try makeGateRepository(at: root, try gateFiles().merging([
+                "Package.swift": packageManifest(
+                    #"Package(name: "Sample", platforms: [.iOS(.v15)], targets: [.target(name: "Lib", path: "Lib", resources: [.process("\#(resource)")])])"#
+                ),
+                "Lib/Answer.swift": "public let answer = 42\n",
+                "Lib/\(file)": trackingManifest
+            ]) { $1 })
+
+            #expect(try check(configFile).violations.map(\.code) == codes)
+        }
+    }
+
+    @Test("a source in a symlinked target directory has one repository path in the index and string scans")
+    func symlinkedSourceHasOnePath() throws {
+        try withTemporaryDirectory { root in
+            let call = ["module": "Core", "file": "Pod/Classes/Clock.swift", "api": "systemUptime", "reason": "35F9.1", "purpose": "Measure elapsed time"]
+            let configFile = try makeGateRepository(at: root, try gateFiles(calls: [call]).merging([
+                "Package.swift": packageManifest(
+                    #"Package(name: "Sample", platforms: [.iOS(.v15)], targets: [.target(name: "Core", path: "Sources/Core", resources: [.process("PrivacyInfo.xcprivacy")])])"#
+                ),
+                "Pod/Classes/Clock.swift": "import Foundation\n\n"
+                    + #"public func uptime() -> (TimeInterval, Any?) { (ProcessInfo.processInfo.systemUptime, ProcessInfo.processInfo.value(forKey: "systemUptime")) }"#
+                    + "\n",
+                "Pod/Classes/PrivacyInfo.xcprivacy": privacyManifest([bootTime: "35F9.1"])
+            ]) { $1 })
+            try FileManager.default.createDirectory(at: root.appending(path: "Sources"), withIntermediateDirectories: true)
+            try FileManager.default.createSymbolicLink(atPath: root.appending(path: "Sources/Core").path, withDestinationPath: "../Pod/Classes")
+
+            let violations = try check(configFile).violations
+
+            #expect(violations.isEmpty)
+        }
+    }
+
+    @Test("a source in a target directory symlinked from outside the checkout exits 2 naming the file")
+    func sourceOutsideCheckoutExitsTwo() async throws {
+        let directory = try makeTemporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let root = directory.appending(path: "repository", directoryHint: .isDirectory)
+        let config = try makeGateRepository(at: root, try gateFiles().merging([
+            "Package.swift": packageManifest(#"Package(name: "Sample", platforms: [.iOS(.v15)], targets: [.target(name: "Core", path: "Sources/Core")])"#)
+        ]) { $1 })
+        try writeFile("public let answer = 42\n", to: directory.appending(path: "shared/Core/Answer.swift"))
+        try FileManager.default.createDirectory(at: root.appending(path: "Sources"), withIntermediateDirectories: true)
+        try FileManager.default.createSymbolicLink(atPath: root.appending(path: "Sources/Core").path, withDestinationPath: "../../shared/Core")
+        let arguments = ["check", "--config", config.path]
+
+        let result = try await #require(processExitsWith: .exitCode(2), observing: [\.standardErrorContent]) { [arguments = arguments as [String]] in
+            await runCommand(arguments, stepSummary: nil)
+        }
+
+        let errors = try text(result.standardErrorContent)
+        #expect(errors.contains("Sources/Core/Answer.swift resolves to "))
+        #expect(errors.contains("/shared/Core/Answer.swift, outside the git checkout"))
+    }
+
+    @Test("a package below a repository root reached through a symlink keeps findings, usage.json entries and annotations repository-relative")
+    func packageBelowRepositoryRoot() throws {
+        try withTemporaryDirectory { directory in
+            let repository = directory.appending(path: "repository", directoryHint: .isDirectory)
+            let root = directory.appending(path: "link", directoryHint: .isDirectory)
+            try FileManager.default.createDirectory(at: repository, withIntermediateDirectories: true)
+            try FileManager.default.createSymbolicLink(at: root, withDestinationURL: repository)
+            let source = clock + "\npublic let uptimeKey = \"systemUptime\"\n"
+            let configFile = try makeGateRepository(at: root, try gateFiles(
+                packagePath: "../../SDK",
+                calls: [bootTimeCall("mach_absolute_time", in: "SDK/Lib/Clock.swift"), bootTimeCall("systemUptime", in: "SDK/Lib/Clock.swift")]
+            ).merging([
+                "SDK/Package.swift": libPackage,
+                "SDK/Lib/Clock.swift": source,
+                "SDK/Lib/PrivacyInfo.xcprivacy": privacyManifest([bootTime: "35F9.1", userDefaults: "CA92.1"])
+            ]) { $1 })
+
+            let (config, _, violations) = try check(configFile)
+
+            #expect(violations.map { Report.annotation($0, root: config.repositoryRoot) } == [
+                "::error file=SDK/Lib/PrivacyInfo.xcprivacy,line=2,title=EXTRA_CATEGORY::Lib: the manifest declares \(userDefaults), but no code in the module uses it. "
+                    + "Remove the entry, and the NSPrivacyAccessedAPITypes key with its last entry (TN3181), or add an override with evidence to usage.json if Apple requires it"
+            ])
+        }
+    }
+}

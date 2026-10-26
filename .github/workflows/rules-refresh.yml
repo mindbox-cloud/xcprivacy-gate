@@ -1,0 +1,36 @@
+name: Apple privacy rules
+
+on:
+  schedule:
+    - cron: '0 6 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: apple-privacy-rules
+  cancel-in-progress: false
+
+jobs:
+  refresh:
+    runs-on: macos-26
+    timeout-minutes: 20
+    env:
+      BRANCH: bot/apple-privacy-rules
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: main
+          token: ${{ secrets.PAT_FOR_TRIGGERING_BRANCH_PROTECTION }}
+      - uses: maxim-lobanov/setup-xcode@ed7a3b1fda3918c0306d1b724322adc0b8cc0a90 # v1.7.0
+        with:
+          xcode-version: latest-stable
+      - name: Build
+        run: swift build -c release --force-resolved-versions
+      - name: Open or update the rules PR
+        env:
+          GH_TOKEN: ${{ secrets.PAT_FOR_TRIGGERING_BRANCH_PROTECTION }}
+          BASE_BRANCH: main
+          BODY: ${{ runner.temp }}/pr-body.md
+        run: bash scripts/rules-pr.sh .build/release/xcprivacy-gate

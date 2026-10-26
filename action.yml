@@ -1,0 +1,52 @@
+name: xcprivacy-gate
+description: Fails when a Swift package's privacy manifests and the required-reason APIs its code uses disagree.
+
+inputs:
+  args:
+    description: The xcprivacy-gate arguments on one line, split on whitespace, for example "check --config .github/privacy-manifest/config.json".
+    required: true
+  working-directory:
+    description: The directory xcprivacy-gate runs in.
+    required: false
+    default: .
+
+runs:
+  using: composite
+  steps:
+    - name: Require macOS
+      shell: bash
+      run: |
+        if [ "$RUNNER_OS" != macOS ]; then
+          echo "::error title=xcprivacy-gate::xcprivacy-gate needs a macOS runner with Xcode, but this runner is $RUNNER_OS"
+          exit 2
+        fi
+    - name: Name the build cache
+      id: cache
+      shell: bash
+      env:
+        ACTION_REF: ${{ github.action_ref || github.sha }}
+      run: |
+        xcode=$(xcodebuild -version | tr -s ' \n' '-' | sed 's/-$//')
+        echo "path=$GITHUB_ACTION_PATH/.build" >> "$GITHUB_OUTPUT"
+        echo "key=xcprivacy-gate-$RUNNER_OS-$xcode-$ACTION_REF" >> "$GITHUB_OUTPUT"
+    - uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      id: restore
+      with:
+        path: ${{ steps.cache.outputs.path }}
+        key: ${{ steps.cache.outputs.key }}
+    - name: Build xcprivacy-gate
+      shell: bash
+      run: swift build -c release --force-resolved-versions --package-path "$GITHUB_ACTION_PATH"
+    - uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      if: steps.restore.outputs.cache-hit != 'true'
+      with:
+        path: ${{ steps.cache.outputs.path }}
+        key: ${{ steps.cache.outputs.key }}
+    - name: Run xcprivacy-gate
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      env:
+        ARGS: ${{ inputs.args }}
+      run: |
+        read -r -a arguments <<< "$ARGS"
+        exec "$GITHUB_ACTION_PATH/.build/release/xcprivacy-gate" "${arguments[@]}"

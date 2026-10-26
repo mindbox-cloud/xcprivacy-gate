@@ -1,0 +1,8 @@
+xcprivacy-gate is released under the MIT license (see LICENSE).
+
+Rules/apple/ and the reason texts in Rules/rules.json are excerpts of Apple developer documentation,
+© Apple Inc. They are included for comparison and are not covered by the MIT license.
+
+The test pages under Tests/XCPrivacyGateTests/Data/ that were saved from developer.apple.com, and the
+TN3181 text and reason texts in the dated rules copies there, are likewise © Apple Inc. and not covered by
+the MIT license.
