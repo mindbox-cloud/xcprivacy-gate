@@ -48,13 +48,13 @@ func writeFiles(_ files: [String: String], to root: URL) throws {
     }
 }
 
-func runCommand(_ arguments: [String], stepSummary: String?) {
+func runCommand(_ arguments: [String], stepSummary: String?) async {
     if let stepSummary {
         setenv("GITHUB_STEP_SUMMARY", stepSummary, 1)
     } else {
         unsetenv("GITHUB_STEP_SUMMARY")
     }
-    XCPrivacyGateCommand.main(arguments)
+    await XCPrivacyGateCommand.main(arguments)
 }
 
 func testData(_ path: String) throws -> URL {

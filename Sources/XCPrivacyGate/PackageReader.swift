@@ -32,6 +32,10 @@ package enum PackageReader {
         try Data(Toolchain.run(["swift", "package", "--package-path", root.path, "dump-package"]).utf8)
     }
 
+    static func read(root: URL) throws -> PackageDescription {
+        try read(description: describe(root: root), dump: dump(root: root))
+    }
+
     package static func read(description: Data, dump: Data) throws -> PackageDescription {
         let package = try decode(DescribedPackage.self, from: description, printedBy: "describe")
         let dumped = try decode(DumpedPackage.self, from: dump, printedBy: "dump-package")

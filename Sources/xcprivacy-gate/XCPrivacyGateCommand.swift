@@ -8,17 +8,21 @@ struct XCPrivacyGateCommand: ParsableCommand {
     static let configuration = CommandConfiguration(
         commandName: "xcprivacy-gate",
         abstract: "Compares the SDK's privacy manifests with the privacy-relevant APIs its code uses.",
-        subcommands: [CheckCommand.self, SelfTestCommand.self, LearnCommand.self]
+        subcommands: [CheckCommand.self, SelfTestCommand.self, LearnCommand.self, RefreshCommand.self]
     )
 
-    static func main() {
-        main(nil)
+    static func main() async {
+        await main(nil)
     }
 
-    static func main(_ arguments: [String]?) {
+    static func main(_ arguments: [String]?) async {
         do {
             var command = try parseAsRoot(arguments)
-            try command.run()
+            if var asyncCommand = command as? AsyncParsableCommand {
+                try await asyncCommand.run()
+            } else {
+                try command.run()
+            }
         } catch {
             finish(with: error)
         }
@@ -50,7 +54,7 @@ struct CheckCommand: ParsableCommand {
 
     func run() throws {
         let gateConfig = try GateConfig.load(URL(fileURLWithPath: config))
-        let result = try Gate.check(config: gateConfig, rules: bundledRules(), today: Date())
+        let result = try Gate.check(config: gateConfig, rules: bundledRules(), appleSdks: SDKList.read(RulesBundle.directory.appending(path: SDKList.fileName)), today: Date())
         try conclude(title: result.title, violations: result.violations, root: gateConfig.repositoryRoot)
     }
 }
@@ -83,6 +87,45 @@ struct LearnCommand: ParsableCommand {
         let rulesFile = URL(fileURLWithPath: rulesDirectory, isDirectory: true).appending(path: "rules.json")
         try Learn.update(rulesFile: rulesFile, api: api)
         print("\(rulesFile.path): learned \(api ?? "every API")")
+    }
+}
+
+struct RefreshCommand: AsyncParsableCommand {
+    static let configuration = CommandConfiguration(
+        commandName: "refresh",
+        abstract: "Updates the rules from Apple's documentation pages, or with --check reports Apple's changes that concern one SDK."
+    )
+
+    @Flag(help: "Report changed conditions of the reasons the config's SDK declares and Apple's live SDK-list verdict; write nothing.")
+    var check = false
+
+    @Option(help: "With --check: the gate's config.json.")
+    var config: String?
+
+    @Option(help: "The rules directory of the tool's source tree.")
+    var rulesDirectory: String?
+
+    @Option(help: "Where to write the pull request body when the rules change.")
+    var outPrBody: String?
+
+    func run() async throws {
+        let session = URLSession(configuration: .ephemeral)
+        switch (check, config, rulesDirectory, outPrBody) {
+        case (true, let config?, nil, nil):
+            let gateConfig = try GateConfig.load(URL(fileURLWithPath: config))
+            let result = try await Refresh.check(config: gateConfig, rulesDirectory: RulesBundle.directory, session: session)
+            try conclude(title: result.title, violations: result.violations, root: gateConfig.repositoryRoot)
+        case (false, nil, let rulesDirectory?, let outPrBody?):
+            let result = try await Refresh.run(rulesDirectory: URL(fileURLWithPath: rulesDirectory, isDirectory: true), session: session)
+            guard result.changed else {
+                print("Apple's pages match the rules in \(rulesDirectory)")
+                return
+            }
+            try Data(result.body.utf8).write(to: URL(fileURLWithPath: outPrBody))
+            print("Apple's pages changed; the rules in \(rulesDirectory) are updated and the pull request body is in \(outPrBody)")
+        default:
+            throw ValidationError("use refresh --rules-directory <path> --out-pr-body <path>, or refresh --check --config <path>")
+        }
     }
 }
 

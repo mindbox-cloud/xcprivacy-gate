@@ -6,6 +6,7 @@ package struct GateConfig: Equatable, Sendable {
     package let repositoryRoot: URL
     package let userDefaultsAppGroup: Bool
     package let trackingDisabled: Bool
+    package let appleSdkList: AppleSDKListing?
 
     package static func load(_ url: URL) throws -> GateConfig {
         let file = url.standardizedFileURL
@@ -24,6 +25,7 @@ package struct GateConfig: Equatable, Sendable {
         packagePath = raw.packagePath.map { Self.resolve($0, against: directory, isDirectory: true) } ?? repositoryRoot
         userDefaultsAppGroup = raw.policy.userDefaultsAppGroup
         trackingDisabled = raw.policy.trackingDisabled
+        appleSdkList = raw.appleSdkList
     }
 
     private static func resolve(_ path: String, against directory: URL, isDirectory: Bool) -> URL {
@@ -44,6 +46,7 @@ private struct RawConfig: Decodable {
     let usage: String
     let packagePath: String?
     let policy: Policy
+    let appleSdkList: AppleSDKListing?
 
     struct Policy: Decodable {
         let userDefaultsAppGroup: Bool
@@ -66,6 +69,7 @@ private struct RawConfig: Decodable {
         case usage
         case packagePath
         case policy
+        case appleSdkList
     }
 
     init(from decoder: Decoder) throws {
@@ -74,6 +78,7 @@ private struct RawConfig: Decodable {
         usage = try container.decode(String.self, forKey: .usage)
         packagePath = try container.contains(.packagePath) ? container.decode(String.self, forKey: .packagePath) : nil
         policy = try container.decode(Policy.self, forKey: .policy)
+        appleSdkList = try container.contains(.appleSdkList) ? container.decode(AppleSDKListing.self, forKey: .appleSdkList) : nil
     }
 
     init(contentsOf file: URL) throws {

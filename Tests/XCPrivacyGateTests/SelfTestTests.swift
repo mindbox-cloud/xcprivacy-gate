@@ -114,7 +114,7 @@ struct SelfTestTests {
         let summary = directory.appending(path: "step-summary.md")
 
         let result = try await #require(processExitsWith: .success, observing: [\.standardOutputContent]) { [summary = summary.path as String?] in
-            runCommand(["self-test"], stepSummary: summary)
+            await runCommand(["self-test"], stepSummary: summary)
         }
 
         #expect(String(bytes: result.standardOutputContent, encoding: .utf8) == "Privacy manifest gate, self-test: 0 violations\n")

@@ -2,9 +2,8 @@
 set -euo pipefail
 
 main() {
-  : "${BRANCH:?}" "${BASE_BRANCH:?}" "${REVIEWER:?}" "${BODY:?}"
-  local rules_directory
-  rules_directory=$(cd "$(dirname "${BASH_SOURCE[0]}")/../Rules" && pwd)
+  : "${BRANCH:?}" "${BASE_BRANCH:?}" "${BODY:?}"
+  local gate=${1:?usage: rules-pr.sh <path of the built xcprivacy-gate>}
   local open_prs
   open_prs=$(gh pr list --head "$BRANCH" --state open --json number --jq length)
   if [ "$open_prs" != "0" ]; then
@@ -13,8 +12,8 @@ main() {
   else
     git switch --quiet -C "$BRANCH"
   fi
-  "$@"
-  git add -- "$rules_directory/rules.json" "$rules_directory/apple"
+  "$gate" refresh --rules-directory Rules --out-pr-body "$BODY"
+  git add -- Rules/rules.json Rules/apple
   if git diff --cached --quiet; then
     echo "Apple's pages match the rules on $BRANCH"
     return 0
@@ -26,8 +25,7 @@ main() {
     gh pr comment "$BRANCH" --body-file "$BODY"
   else
     git push --quiet --force origin "$BRANCH"
-    gh pr create --base "$BASE_BRANCH" --head "$BRANCH" --title "feat: refresh Apple privacy rules" \
-      --body-file "$BODY" --reviewer "$REVIEWER"
+    gh pr create --base "$BASE_BRANCH" --head "$BRANCH" --title "feat: refresh Apple privacy rules" --body-file "$BODY"
   fi
 }
 

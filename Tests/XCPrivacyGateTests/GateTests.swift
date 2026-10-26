@@ -47,7 +47,12 @@ private func makeRepository(at root: URL, _ files: [String: String]) throws -> U
 
 private func check(_ configFile: URL) throws -> (config: GateConfig, title: String, violations: [Violation]) {
     let config = try GateConfig.load(configFile)
-    let result = try Gate.check(config: config, rules: Rules.load(RulesBundle.directory.appending(path: "rules.json")), today: Date())
+    let result = try Gate.check(
+        config: config,
+        rules: Rules.load(RulesBundle.directory.appending(path: "rules.json")),
+        appleSdks: SDKList.read(RulesBundle.directory.appending(path: SDKList.fileName)),
+        today: Date()
+    )
     return (config, result.title, result.violations)
 }
 
@@ -71,7 +76,7 @@ struct GateTests {
         let arguments = ["check", "--config", config.path]
 
         let result = try await #require(processExitsWith: .exitCode(1), observing: [\.standardOutputContent]) { [arguments = arguments as [String], summary = summary.path as String?] in
-            runCommand(arguments, stepSummary: summary)
+            await runCommand(arguments, stepSummary: summary)
         }
 
         let output = try text(result.standardOutputContent)
@@ -103,7 +108,7 @@ struct GateTests {
         let arguments = ["check", "--config", config.path]
 
         let result = try await #require(processExitsWith: .success, observing: [\.standardOutputContent]) { [arguments = arguments as [String]] in
-            runCommand(arguments, stepSummary: nil)
+            await runCommand(arguments, stepSummary: nil)
         }
 
         #expect(try text(result.standardOutputContent) == "Privacy manifest gate, check of Sample: 0 violations\n")
@@ -118,7 +123,7 @@ struct GateTests {
         let arguments = ["check", "--config", try makeRepository(at: root, files).path]
 
         let result = try await #require(processExitsWith: .exitCode(2), observing: [\.standardOutputContent, \.standardErrorContent]) { [arguments = arguments as [String]] in
-            runCommand(arguments, stepSummary: nil)
+            await runCommand(arguments, stepSummary: nil)
         }
 
         #expect(try text(result.standardErrorContent).contains("usage.json: not valid JSON"))
@@ -130,7 +135,7 @@ struct GateTests {
     @Test("an unknown argument exits 2")
     func unknownArgumentExitsTwo() async throws {
         let result = try await #require(processExitsWith: .exitCode(2), observing: [\.standardOutputContent, \.standardErrorContent]) {
-            runCommand(["check", "--config", "config.json", "--lanes", "source"], stepSummary: nil)
+            await runCommand(["check", "--config", "config.json", "--lanes", "source"], stepSummary: nil)
         }
 
         #expect(try text(result.standardErrorContent).contains("Unknown option '--lanes'"))
@@ -140,7 +145,7 @@ struct GateTests {
     @Test("the bare command without a subcommand exits 2 and says a subcommand is required")
     func bareCommandExitsTwo() async throws {
         let result = try await #require(processExitsWith: .exitCode(2), observing: [\.standardErrorContent]) {
-            runCommand([], stepSummary: nil)
+            await runCommand([], stepSummary: nil)
         }
 
         #expect(try text(result.standardErrorContent).hasPrefix("Error: a subcommand is required\n"))
@@ -149,7 +154,7 @@ struct GateTests {
     @Test("--help exits 0 with the overview")
     func helpExitsZero() async throws {
         let result = try await #require(processExitsWith: .success, observing: [\.standardOutputContent]) {
-            runCommand(["--help"], stepSummary: nil)
+            await runCommand(["--help"], stepSummary: nil)
         }
 
         #expect(try text(result.standardOutputContent).hasPrefix("OVERVIEW: "))
