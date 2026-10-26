@@ -194,6 +194,8 @@ summary is also appended to the job summary.
 - The compiled-object scan does not see access by string, and private suite names of 15 bytes or fewer are invisible
   to it: Swift stores such small strings inline, not in the string section.
 - Only the string scan sees `#else` branches of `#if SWIFT_PACKAGE`, because the build is SwiftPM's.
+- Every source must lie inside the git checkout that holds the config, symlinks resolved: a target directory linked
+  from outside the checkout is a tool error.
 - Only the iOS build is compiled, so the index and object scans miss an API that code uses only in a tvOS, watchOS
   or visionOS branch; the string scan still reads string literals there.
 

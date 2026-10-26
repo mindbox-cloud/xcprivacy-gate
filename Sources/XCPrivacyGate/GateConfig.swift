@@ -32,7 +32,7 @@ package struct GateConfig: Sendable {
 
     private static func requirePackage(_ packagePath: String, from directory: URL, inside checkout: URL) throws {
         let resolved = resolve(packagePath, against: URL(fileURLWithPath: directory.canonicalPath, isDirectory: true), isDirectory: true).canonicalPath
-        guard URL(fileURLWithPath: resolved).pathComponents.starts(with: checkout.pathComponents) else {
+        guard checkout.encloses(resolved) else {
             throw ToolError(message: "\"packagePath\" resolves to \(resolved), outside the git checkout \(checkout.path) that holds the config")
         }
     }

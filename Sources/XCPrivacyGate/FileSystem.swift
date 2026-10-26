@@ -23,6 +23,10 @@ extension URL {
         return String(cString: resolved)
     }
 
+    func encloses(_ path: String) -> Bool {
+        URL(fileURLWithPath: path).pathComponents.starts(with: pathComponents)
+    }
+
     func text() throws -> String {
         do {
             return try String(contentsOf: self, encoding: .utf8)

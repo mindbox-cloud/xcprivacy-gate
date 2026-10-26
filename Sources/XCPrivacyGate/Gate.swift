@@ -4,6 +4,7 @@ package enum Gate {
     package static func check(config: GateConfig, rules: Rules, today: Date) throws -> (title: String, violations: [Violation]) {
         let usage = try Usage.load(config.usage, rules: rules, userDefaultsAppGroup: config.userDefaultsAppGroup)
         let package = try PackageReader.read(root: config.packagePath)
+        try requireSourcesInside(config.repositoryRoot, package: package)
         let declared = manifests(of: package, rules: rules, trackingDisabled: config.trackingDisabled)
         var violations = package.violations + declared.violations
         let use = try WorkDirectory.with { work in
@@ -24,6 +25,14 @@ package enum Gate {
             violations += found
         }
         return (manifests, violations)
+    }
+
+    private static func requireSourcesInside(_ root: URL, package: PackageDescription) throws {
+        let outside = package.targets.flatMap(\.sources).filter { !root.encloses($0.canonicalPath) }
+        guard outside.isEmpty else {
+            let files = outside.map { "\(Report.repositoryRelative($0.path, root: root)) resolves to \($0.canonicalPath)" }.joined(separator: ", ")
+            throw ToolError(message: "\(files), outside the git checkout \(root.path): the gate needs every source inside the checkout")
+        }
     }
 
     private static func scan(
