@@ -29,7 +29,7 @@ package struct ToolError: Error, CustomStringConvertible {
 package enum Report {
     package static func annotation(_ violation: Violation, root: URL) -> String {
         var properties: [String] = []
-        if let file = violation.file, !file.isEmpty {
+        if let file = violation.file {
             properties.append("file=\(escapeProperty(repositoryRelative(file, root: root)))")
             if let line = violation.line {
                 properties.append("line=\(line)")
