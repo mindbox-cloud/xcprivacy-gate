@@ -8,6 +8,7 @@ struct XCPrivacyGateCommand: ParsableCommand {
     static let configuration = CommandConfiguration(
         commandName: "xcprivacy-gate",
         abstract: "Compares the SDK's privacy manifests with the privacy-relevant APIs its code uses.",
+        version: ToolVersion.current,
         subcommands: [CheckCommand.self, SelfTestCommand.self, LearnCommand.self, RefreshCommand.self]
     )
 
