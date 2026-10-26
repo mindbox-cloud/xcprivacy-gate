@@ -6,7 +6,7 @@ import SwiftSyntax
 package enum StringLiterals {
     package static func findings(targets: [PackageTarget], rules: Rules, usage: Usage, root: URL) throws -> [String: ModuleFindings] {
         var apisByString: [String: [ApiRule]] = [:]
-        for rule in rules.apis.values.sorted(by: { $0.api < $1.api }) {
+        for rule in rules.sortedApis {
             for string in rule.strings {
                 apisByString[string, default: []].append(rule)
             }

@@ -13,7 +13,7 @@ package enum BinaryScanner {
     package static func findings(build: SDKBuild, targets: [PackageTarget], rules: Rules, usage: Usage) throws -> [String: ModuleFindings] {
         let evidence = try read(targets.map { build.object(of: $0.name) })
         let suites = Set(usage.privateSuites)
-        let apis = rules.apis.values.sorted { $0.api < $1.api }
+        let apis = rules.sortedApis
         var modules: [String: ModuleFindings] = [:]
         for target in targets {
             let object = build.object(of: target.name)

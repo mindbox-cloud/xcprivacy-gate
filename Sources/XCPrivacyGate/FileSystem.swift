@@ -7,6 +7,11 @@ enum WorkDirectory {
         defer { try? FileManager.default.removeItem(at: directory) }
         return try body(directory)
     }
+
+    static func copy(_ file: URL, to copy: URL) throws {
+        try FileManager.default.createDirectory(at: copy.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try FileManager.default.copyItem(at: file, to: copy)
+    }
 }
 
 extension URL {

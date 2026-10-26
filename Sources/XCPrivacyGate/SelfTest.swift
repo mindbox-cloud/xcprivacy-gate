@@ -45,7 +45,7 @@ package enum SelfTest {
     }
 
     package static func incomplete(rules: Rules, rulesDirectory: URL) -> [Violation] {
-        rules.apis.values.sorted { $0.api < $1.api }.compactMap { rule in
+        rules.sortedApis.compactMap { rule in
             var missing: [String] = []
             if rule.usrs.isEmpty {
                 missing.append("usrs")
@@ -73,8 +73,7 @@ package enum SelfTest {
         let root = work.appending(path: "sources", directoryHint: .isDirectory)
         let sources = try files.map { file in
             let copy = root.appending(path: file)
-            try FileManager.default.createDirectory(at: copy.deletingLastPathComponent(), withIntermediateDirectories: true)
-            try FileManager.default.copyItem(at: rulesDirectory.appending(path: file), to: copy)
+            try WorkDirectory.copy(rulesDirectory.appending(path: file), to: copy)
             return copy
         }
         let index = work.appending(path: "index", directoryHint: .isDirectory)

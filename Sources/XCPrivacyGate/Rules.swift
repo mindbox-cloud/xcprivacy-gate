@@ -158,6 +158,10 @@ package struct Rules: Sendable {
     package let dataTypes: Set<String>
     package let purposes: Set<String>
 
+    var sortedApis: [ApiRule] {
+        apis.values.sorted { $0.api < $1.api }
+    }
+
     package static func load(_ url: URL) throws -> Rules {
         try RulesFile.load(url).rules
     }

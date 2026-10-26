@@ -57,8 +57,7 @@ package enum Learn {
             let sources = work.appending(path: "sources", directoryHint: .isDirectory)
             let copies = try fixtures.enumerated().map { position, fixture in
                 let copy = sources.appending(path: "\(position)/\(fixture.lastPathComponent)")
-                try FileManager.default.createDirectory(at: copy.deletingLastPathComponent(), withIntermediateDirectories: true)
-                try FileManager.default.copyItem(at: fixture, to: copy)
+                try WorkDirectory.copy(fixture, to: copy)
                 return copy
             }
             let baseline = sources.appending(path: "\(baselineName).swift")

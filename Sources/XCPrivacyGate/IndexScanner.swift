@@ -21,7 +21,7 @@ package struct IndexScanner {
     }
 
     package func findings(targets: [PackageTarget], rules: Rules, root: URL) throws -> [String: ModuleFindings] {
-        let matchers = rules.apis.values.sorted { $0.api < $1.api }.map(UsrMatcher.init)
+        let matchers = rules.sortedApis.map(UsrMatcher.init)
         return try read(targets.flatMap(\.sources), root: root) { index in
             var modules: [String: ModuleFindings] = [:]
             for target in targets {
