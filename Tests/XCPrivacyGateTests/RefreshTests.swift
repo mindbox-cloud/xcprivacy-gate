@@ -400,6 +400,29 @@ struct RefreshTests {
         #expect(try snapshot(directory) == before)
     }
 
+    @Test("refresh --check reads only the required-reasons page, and Apple's SDK page only for a config with appleSdkList", arguments: [false, true])
+    func checkReadsOnlyThePagesItReports(withSdkList: Bool) async throws {
+        var pages = try SavedPages()
+        let directory = try pages.rulesDirectory()
+        let repository = try makeSampleRepository(usage: [], appleSdkList: withSdkList ? ["name": "Sample", "listed": false] : nil)
+        defer {
+            try? FileManager.default.removeItem(at: repository)
+            try? FileManager.default.removeItem(at: directory)
+        }
+        let broken = Data("<!DOCTYPE html><html><body>Moved</body></html>".utf8)
+        for page in [ApplePage.dataTypes, .purposes, .tn3181] + (withSdkList ? [] : [.sdkList]) {
+            pages.bodies[page] = broken
+        }
+        let site = pages.site()
+        let config = try GateConfig.load(repository.appending(path: ".github/privacy-manifest/config.json"))
+
+        let violations = try await Refresh.check(config: config, rulesDirectory: directory, session: site.session).violations
+
+        #expect(violations.isEmpty)
+        let read: [ApplePage] = withSdkList ? [.requiredReasons, .sdkList] : [.requiredReasons]
+        #expect(site.requests.compactMap(\.url?.absoluteString).sorted() == read.map(\.address).sorted())
+    }
+
     @Test(
         "refresh --check gives Apple's live verdict on the configured SDK",
         arguments: [("Alamofire", ["SDK_ON_APPLE_LIST"]), ("Sample", [])] as [(String, [String])]
