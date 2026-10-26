@@ -176,7 +176,7 @@ summary is also appended to the job summary.
 | `TARGET_WITHOUT_MANIFEST_USES_API` | a target without a manifest uses a required-reason API |
 | `OVERRIDE_EXPIRED`, `REGISTRY_UNKNOWN_MODULE`, `REGISTRY_UNKNOWN_REASON` | an entry in `usage.json` is out of date |
 | `MANIFEST_API_ENTRY_KEYS`, `MANIFEST_DATA_ENTRY_KEYS`, `MANIFEST_DUPLICATE_ENTRY`, `MANIFEST_DUPLICATE_KEY`, `MANIFEST_EMPTY_API_TYPES`, `MANIFEST_EMPTY_REASONS`, `MANIFEST_FILE_NAME`, `MANIFEST_MISSING_KEY`, `MANIFEST_REASON_WRONG_CATEGORY`, `MANIFEST_TYPE`, `MANIFEST_UNKNOWN_CATEGORY`, `MANIFEST_UNKNOWN_DATA_TYPE`, `MANIFEST_UNKNOWN_KEY`, `MANIFEST_UNKNOWN_PURPOSE`, `MANIFEST_UNKNOWN_REASON`, `MANIFEST_UNREADABLE` | the manifest is not valid by Apple's rules |
-| `TRACKING_ENABLED`, `TRACKING_DOMAINS` | tracking breaks the `trackingDisabled` policy, or the tracking domains do not match `NSPrivacyTracking` |
+| `TRACKING_ENABLED`, `TRACKING_DOMAINS` | tracking breaks the `trackingDisabled` policy, or the tracking domains do not match `NSPrivacyTracking` or are not bare host names |
 | `MANIFEST_NOT_WIRED` | a manifest at the target's root is not shipped as a resource: `Package.swift` does not list it, or names it in another case |
 | `PACKAGE_DEPENDENCY`, `UNSCANNABLE_SOURCE` | the package has code the gate cannot read (see [Limitations](#limitations)) |
 | `SDK_ON_APPLE_LIST`, `SDK_OFF_APPLE_LIST` | `refresh --check`: Apple's live SDK list disagrees with `appleSdkList` |
@@ -194,6 +194,8 @@ summary is also appended to the job summary.
 - The compiled-object scan does not see access by string, and private suite names of 15 bytes or fewer are invisible
   to it: Swift stores such small strings inline, not in the string section.
 - Only the string scan sees `#else` branches of `#if SWIFT_PACKAGE`, because the build is SwiftPM's.
+- Only the iOS build is compiled, so the index and object scans miss an API that code uses only in a tvOS, watchOS
+  or visionOS branch; the string scan still reads string literals there.
 
 ## Versioning
 
