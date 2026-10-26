@@ -16,8 +16,8 @@ For each library target of the package:
 - the manifest declares a category that no code in the module uses;
 - every call has an entry in `usage.json` with Apple's reason code and a purpose, and the manifest declares exactly
   the registered reasons;
-- the manifest is valid by Apple's rules (keys, types, categories, reasons, data types, purposes, tracking) and
-  `Package.swift` ships it as a resource of the target.
+- the manifest is named `PrivacyInfo.xcprivacy`, is valid by Apple's rules (keys, types, categories, reasons, data
+  types, purposes, tracking) and `Package.swift` ships it as a resource of the target.
 
 Each finding is a GitHub annotation on `file:line` when the gate knows the line.
 
@@ -174,9 +174,9 @@ summary is also appended to the job summary.
 | `UD_APP_GROUP_REQUIRED`, `UD_STANDARD_REQUIRED`, `UD_CA92_UNUSED` | the UserDefaults reasons break the `userDefaultsAppGroup` policy |
 | `TARGET_WITHOUT_MANIFEST_USES_API` | a target without a manifest uses a required-reason API |
 | `OVERRIDE_EXPIRED`, `REGISTRY_UNKNOWN_MODULE`, `REGISTRY_UNKNOWN_REASON` | an entry in `usage.json` is out of date |
-| `MANIFEST_API_ENTRY_KEYS`, `MANIFEST_DATA_ENTRY_KEYS`, `MANIFEST_DUPLICATE_ENTRY`, `MANIFEST_DUPLICATE_KEY`, `MANIFEST_EMPTY_API_TYPES`, `MANIFEST_EMPTY_REASONS`, `MANIFEST_FILE_NAME`, `MANIFEST_MISSING_FILE`, `MANIFEST_MISSING_KEY`, `MANIFEST_REASON_WRONG_CATEGORY`, `MANIFEST_TYPE`, `MANIFEST_UNKNOWN_CATEGORY`, `MANIFEST_UNKNOWN_DATA_TYPE`, `MANIFEST_UNKNOWN_KEY`, `MANIFEST_UNKNOWN_PURPOSE`, `MANIFEST_UNKNOWN_REASON`, `MANIFEST_UNREADABLE` | the manifest is not valid by Apple's rules |
+| `MANIFEST_API_ENTRY_KEYS`, `MANIFEST_DATA_ENTRY_KEYS`, `MANIFEST_DUPLICATE_ENTRY`, `MANIFEST_DUPLICATE_KEY`, `MANIFEST_EMPTY_API_TYPES`, `MANIFEST_EMPTY_REASONS`, `MANIFEST_FILE_NAME`, `MANIFEST_MISSING_KEY`, `MANIFEST_REASON_WRONG_CATEGORY`, `MANIFEST_TYPE`, `MANIFEST_UNKNOWN_CATEGORY`, `MANIFEST_UNKNOWN_DATA_TYPE`, `MANIFEST_UNKNOWN_KEY`, `MANIFEST_UNKNOWN_PURPOSE`, `MANIFEST_UNKNOWN_REASON`, `MANIFEST_UNREADABLE` | the manifest is not valid by Apple's rules |
 | `TRACKING_ENABLED`, `TRACKING_DOMAINS` | tracking breaks the `trackingDisabled` policy, or the tracking domains do not match `NSPrivacyTracking` |
-| `MANIFEST_NOT_WIRED` | `Package.swift` does not list the target's manifest in its resources |
+| `MANIFEST_NOT_WIRED` | a manifest at the target's root is not shipped as a resource: `Package.swift` does not list it, or names it in another case |
 | `PACKAGE_DEPENDENCY`, `UNSCANNABLE_SOURCE` | the package has code the gate cannot read (see [Limitations](#limitations)) |
 | `SDK_ON_APPLE_LIST`, `SDK_OFF_APPLE_LIST` | Apple's SDK list disagrees with `appleSdkList` |
 | `DECLARED_REASON_CHANGED` | `refresh --check`: Apple changed the condition of a reason the SDK declares |

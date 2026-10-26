@@ -155,14 +155,14 @@ private struct DumpedPackage: Decodable {
 private extension DescribedPackage.Target {
     func packageTarget(in root: URL, definesDebugInRelease: Bool, violations: inout [Violation]) -> PackageTarget {
         let directory = root.appendingPathComponent(path, isDirectory: true).standardized
-        let declared = resources?.first { URL(fileURLWithPath: $0.path, isDirectory: false).lastPathComponent == ManifestValidator.fileName }
-        let unwired = directory.appendingPathComponent(ManifestValidator.fileName)
-        if declared == nil, FileManager.default.fileExists(atPath: unwired.path) {
+        let declared = resources?.map { URL(fileURLWithPath: $0.path, isDirectory: false) }.first { ManifestValidator.isNamedLikeManifest($0.lastPathComponent) }
+        let onDisk = (try? FileManager.default.contentsOfDirectory(atPath: directory.path))?.first(where: ManifestValidator.isNamedLikeManifest)
+        if declared == nil, let onDisk {
             violations.append(Violation(
                 code: "MANIFEST_NOT_WIRED",
                 module: name,
-                message: "\(name): \(ManifestValidator.fileName) exists but Package.swift does not list it in resources",
-                file: unwired.path
+                message: "\(name): \(onDisk) is not shipped as a resource of the target; check the file name's case and the target's resources in Package.swift",
+                file: directory.appendingPathComponent(onDisk).path
             ))
         }
         let files = sources.map { directory.appendingPathComponent($0, isDirectory: false) }
@@ -177,7 +177,7 @@ private extension DescribedPackage.Target {
         return PackageTarget(
             name: name,
             sources: files.filter { $0.pathExtension == "swift" },
-            manifest: declared.map { URL(fileURLWithPath: $0.path, isDirectory: false) },
+            manifest: declared,
             definesDebugInRelease: definesDebugInRelease
         )
     }

@@ -18,6 +18,10 @@ package enum ManifestValidator {
         let manifest = check.run()
         return (manifest, check.violations)
     }
+
+    static func isNamedLikeManifest(_ name: String) -> Bool {
+        name.caseInsensitiveCompare(fileName) == .orderedSame
+    }
 }
 
 private enum Key {
@@ -44,6 +48,9 @@ private struct ManifestCheck {
     var violations: [Violation] = []
 
     mutating func run() -> Manifest? {
+        if url.lastPathComponent != ManifestValidator.fileName {
+            report("MANIFEST_FILE_NAME", "file is named \(url.lastPathComponent.pythonRepr), Apple requires \(ManifestValidator.fileName.pythonRepr)")
+        }
         guard let content = read() else { return nil }
         checkDomains(content, tracking: tracking(content))
         checkCollected(content)
@@ -59,7 +66,13 @@ private struct ManifestCheck {
     }
 
     private mutating func read() -> [String: PlistValue]? {
-        guard let data = fileContents() else { return nil }
+        let data: Data
+        do {
+            data = try Data(contentsOf: url)
+        } catch {
+            report("MANIFEST_UNREADABLE", "cannot read the file: \(error.localizedDescription)")
+            return nil
+        }
         let root: PlistValue
         do throws(PlistReadError) {
             root = try PlistReader.read(data)
@@ -77,24 +90,6 @@ private struct ManifestCheck {
             return nil
         }
         return content
-    }
-
-    private mutating func fileContents() -> Data? {
-        let names = (try? FileManager.default.contentsOfDirectory(atPath: url.deletingLastPathComponent().path)) ?? []
-        guard names.contains(url.lastPathComponent) else {
-            if let other = names.first(where: { $0.lowercased() == url.lastPathComponent.lowercased() }) {
-                report("MANIFEST_FILE_NAME", "file is named \(other.pythonRepr), Apple requires \(ManifestValidator.fileName.pythonRepr)")
-            } else {
-                report("MANIFEST_MISSING_FILE", "file does not exist")
-            }
-            return nil
-        }
-        do {
-            return try Data(contentsOf: url)
-        } catch {
-            report("MANIFEST_UNREADABLE", "cannot read the file: \(error.localizedDescription)")
-            return nil
-        }
     }
 
     private mutating func tracking(_ content: [String: PlistValue]) -> Bool {

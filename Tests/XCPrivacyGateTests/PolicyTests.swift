@@ -351,16 +351,15 @@ struct PolicyTests {
     func sampleSDKReportsFourKnownViolations() throws {
         let names = ["Core", "Notifications", "Logger"]
         var manifests: [String: Manifest] = [:]
-        for name in names {
-            let (parsed, violations) = ManifestValidator.parse(
-                try testData("manifests/\(name).xcprivacy"),
-                module: name,
-                rules: rules,
-                trackingDisabled: true
-            )
-            #expect(violations.isEmpty)
-            let manifest = try #require(parsed)
-            manifests[name] = manifest
+        try withTemporaryDirectory { directory in
+            for name in names {
+                let file = directory.appending(path: "\(name)/PrivacyInfo.xcprivacy")
+                try writeFile(String(contentsOf: testData("manifests/\(name).xcprivacy"), encoding: .utf8), to: file)
+                let (parsed, violations) = ManifestValidator.parse(file, module: name, rules: rules, trackingDisabled: true)
+                #expect(violations.isEmpty)
+                let manifest = try #require(parsed)
+                manifests[name] = manifest
+            }
         }
         let source = [
             "Core": uses(

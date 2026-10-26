@@ -191,19 +191,15 @@ struct ManifestValidatorTests {
         #expect(try codes(xml).contains("MANIFEST_DUPLICATE_ENTRY"))
     }
 
-    @Test("a wrong-case file name is rejected")
+    @Test("a wrong-case file name is rejected and the manifest is still validated")
     func wrongCaseFileNameIsRejected() throws {
-        #expect(try codes(manifestXML(), fileName: "privacyinfo.xcprivacy") == ["MANIFEST_FILE_NAME"])
-    }
+        let xml = manifestXML(tracking: "<true/>", domains: "<array><string>tracker.example.com</string></array>")
 
-    @Test("a missing file is reported")
-    func missingFileIsReported() throws {
-        let (manifest, violations) = try withTemporaryDirectory { directory in
-            ManifestValidator.parse(directory.appendingPathComponent("PrivacyInfo.xcprivacy"), module: "Core", rules: rules, trackingDisabled: true)
-        }
+        let (manifest, violations) = try check(xml, fileName: "privacyinfo.xcprivacy")
 
-        #expect(manifest == nil)
-        #expect(violations.map(\.code) == ["MANIFEST_MISSING_FILE"])
+        #expect(violations.map(\.code) == ["MANIFEST_FILE_NAME", "TRACKING_ENABLED"])
+        #expect(violations.first?.message.contains("'privacyinfo.xcprivacy'") == true)
+        #expect(manifest != nil)
     }
 
     @Test("an unreadable property list is reported")
@@ -318,13 +314,14 @@ struct ManifestValidatorTests {
 
     private func check(_ contents: Data, fileName: String = "PrivacyInfo.xcprivacy", trackingDisabled: Bool = true) throws -> (manifest: Manifest?, violations: [Violation]) {
         try withTemporaryDirectory { directory in
-            try contents.write(to: directory.appendingPathComponent(fileName))
-            return ManifestValidator.parse(directory.appendingPathComponent("PrivacyInfo.xcprivacy"), module: "Core", rules: rules, trackingDisabled: trackingDisabled)
+            let file = directory.appendingPathComponent(fileName)
+            try contents.write(to: file)
+            return ManifestValidator.parse(file, module: "Core", rules: rules, trackingDisabled: trackingDisabled)
         }
     }
 
-    private func codes(_ xml: String, fileName: String = "PrivacyInfo.xcprivacy") throws -> [String] {
-        try check(xml, fileName: fileName).violations.map(\.code)
+    private func codes(_ xml: String) throws -> [String] {
+        try check(xml).violations.map(\.code)
     }
 
     private func message(of code: String, in xml: String) throws -> String {
