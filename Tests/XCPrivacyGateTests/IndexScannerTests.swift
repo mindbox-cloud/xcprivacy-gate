@@ -24,8 +24,7 @@ private struct Sample {
 
     func source(_ path: String, _ lines: String...) throws -> URL {
         let file = root.appending(path: path)
-        try FileManager.default.createDirectory(at: file.deletingLastPathComponent(), withIntermediateDirectories: true)
-        try Data(lines.joined(separator: "\n").utf8).write(to: file)
+        try writeFile(lines.joined(separator: "\n"), to: file)
         return file
     }
 

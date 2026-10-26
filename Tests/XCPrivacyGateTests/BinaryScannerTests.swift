@@ -11,20 +11,15 @@ private let getter = "Foundation.URLResourceValues.contentModificationDate.gette
 private let mixedAPIs: Set = ["systemUptime", "systemFreeSize", "UserDefaults", "mach_absolute_time", "contentModificationDateKey"]
 
 private func binaryRules() throws -> Rules {
-    try Rules(RulesFile(
-        categories: appleRules().categories.mapValues { CategoryReasons(reasons: $0) },
-        apis: [
-            ApiRule(api: "systemUptime", docc: nil, categories: [bootTime], selectors: ["systemUptime"]),
-            ApiRule(api: "mach_absolute_time", docc: nil, categories: [bootTime], symbols: ["_mach_absolute_time"]),
-            ApiRule(api: "systemFreeSize", docc: nil, categories: [diskSpace], symbols: ["_NSFileSystemFreeSize"]),
-            ApiRule(api: "UserDefaults", docc: nil, categories: [userDefaults], symbols: ["_OBJC_CLASS_$_NSUserDefaults"]),
-            ApiRule(api: "contentModificationDateKey", docc: nil, categories: [fileTimestamp], swiftSymbols: [getter]),
-            ApiRule(api: "stat", docc: nil, categories: [fileTimestamp], symbols: ["_stat"]),
-            ApiRule(api: "fstat", docc: nil, categories: [fileTimestamp], symbols: ["_fstat"])
-        ],
-        collectedDataTypes: [],
-        purposes: []
-    ))
+    try rules(
+        with: ApiRule(api: "systemUptime", docc: nil, categories: [bootTime], selectors: ["systemUptime"]),
+        ApiRule(api: "mach_absolute_time", docc: nil, categories: [bootTime], symbols: ["_mach_absolute_time"]),
+        ApiRule(api: "systemFreeSize", docc: nil, categories: [diskSpace], symbols: ["_NSFileSystemFreeSize"]),
+        ApiRule(api: "UserDefaults", docc: nil, categories: [userDefaults], symbols: ["_OBJC_CLASS_$_NSUserDefaults"]),
+        ApiRule(api: "contentModificationDateKey", docc: nil, categories: [fileTimestamp], swiftSymbols: [getter]),
+        ApiRule(api: "stat", docc: nil, categories: [fileTimestamp], symbols: ["_stat"]),
+        ApiRule(api: "fstat", docc: nil, categories: [fileTimestamp], symbols: ["_fstat"])
+    )
 }
 
 private struct Products {
@@ -47,8 +42,7 @@ private struct Products {
 
     func source(_ name: String, _ lines: String...) throws -> URL {
         let file = directory.appending(path: "sources/\(name)")
-        try FileManager.default.createDirectory(at: file.deletingLastPathComponent(), withIntermediateDirectories: true)
-        try Data((lines.joined(separator: "\n") + "\n").utf8).write(to: file)
+        try writeFile(lines.joined(separator: "\n") + "\n", to: file)
         return file
     }
 

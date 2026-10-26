@@ -40,12 +40,45 @@ func packageManifest(_ package: String) -> String {
     "// swift-tools-version:5.9\nimport PackageDescription\n\nlet package = \(package)\n"
 }
 
+func writeFile(_ contents: String, to file: URL) throws {
+    try FileManager.default.createDirectory(at: file.deletingLastPathComponent(), withIntermediateDirectories: true)
+    try Data(contents.utf8).write(to: file)
+}
+
 func writeFiles(_ files: [String: String], to root: URL) throws {
     for (path, contents) in files {
-        let file = root.appending(path: path)
-        try FileManager.default.createDirectory(at: file.deletingLastPathComponent(), withIntermediateDirectories: true)
-        try Data(contents.utf8).write(to: file)
+        try writeFile(contents, to: root.appending(path: path))
     }
+}
+
+func json(_ object: [String: Any]) throws -> String {
+    try #require(String(bytes: JSONSerialization.data(withJSONObject: object, options: .sortedKeys), encoding: .utf8))
+}
+
+func makeGitCheckout(at root: URL) throws {
+    try FileManager.default.createDirectory(at: root.appending(path: ".git", directoryHint: .isDirectory), withIntermediateDirectories: true)
+}
+
+func gateFiles(
+    userDefaultsAppGroup: Bool = false,
+    packagePath: String? = nil,
+    calls: [[String: String]] = [],
+    appleSdkList: [String: Any]? = nil
+) throws -> [String: String] {
+    var config: [String: Any] = ["usage": "usage.json", "policy": ["userDefaultsAppGroup": userDefaultsAppGroup, "trackingDisabled": true]]
+    config["packagePath"] = packagePath
+    config["appleSdkList"] = appleSdkList
+    let usage: [String: Any] = ["calls": calls, "privateUserDefaultsSuites": [String](), "overrides": [String]()]
+    return [
+        ".github/privacy-manifest/config.json": try json(config),
+        ".github/privacy-manifest/usage.json": try json(usage)
+    ]
+}
+
+func makeGateRepository(at root: URL, _ files: [String: String]) throws -> URL {
+    try makeGitCheckout(at: root)
+    try writeFiles(files, to: root)
+    return root.appending(path: ".github/privacy-manifest/config.json")
 }
 
 func runCommand(_ arguments: [String], stepSummary: String?) async {
@@ -63,6 +96,15 @@ func testData(_ path: String) throws -> URL {
 
 func applePage(_ name: String) throws -> [String: Any] {
     try AppleDocs.document(Data(contentsOf: testData(name)), from: name)
+}
+
+func rules(with apis: ApiRule...) throws -> Rules {
+    try Rules(RulesFile(
+        categories: appleRules().categories.mapValues { CategoryReasons(reasons: $0) },
+        apis: apis,
+        collectedDataTypes: [],
+        purposes: []
+    ))
 }
 
 func appleRules() throws -> Rules {

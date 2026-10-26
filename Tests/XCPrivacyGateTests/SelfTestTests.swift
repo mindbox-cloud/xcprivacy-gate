@@ -11,15 +11,6 @@ private let freeSizeFixture = "fixtures/DiskSpace/systemFreeSize.swift"
 private let uptimeUsr = "c:objc(cs)NSProcessInfo(im)systemUptime"
 private let freeSizeUsr = "c:@NSFileSystemFreeSize"
 
-private func rulesWith(_ apis: ApiRule...) throws -> Rules {
-    try Rules(RulesFile(
-        categories: appleRules().categories.mapValues { CategoryReasons(reasons: $0) },
-        apis: apis,
-        collectedDataTypes: [],
-        purposes: []
-    ))
-}
-
 private func committedRules() throws -> Rules {
     try Rules.load(RulesBundle.directory.appending(path: "rules.json"))
 }
@@ -60,7 +51,7 @@ struct SelfTestTests {
 
     @Test("a rule without binary names is incomplete")
     func ruleWithoutBinaryNamesIsIncomplete() throws {
-        let rules = try rulesWith(ApiRule(api: "systemUptime", docc: nil, categories: [bootTime], fixtures: [uptimeFixture], usrs: [uptimeUsr]))
+        let rules = try rules(with: ApiRule(api: "systemUptime", docc: nil, categories: [bootTime], fixtures: [uptimeFixture], usrs: [uptimeUsr]))
 
         let violations = SelfTest.incomplete(rules: rules, rulesDirectory: RulesBundle.directory)
 
@@ -71,7 +62,7 @@ struct SelfTestTests {
 
     @Test("a rule without usrs is incomplete")
     func ruleWithoutUsrsIsIncomplete() throws {
-        let rules = try rulesWith(ApiRule(api: "systemUptime", docc: nil, categories: [bootTime], fixtures: [uptimeFixture], selectors: ["systemUptime"]))
+        let rules = try rules(with: ApiRule(api: "systemUptime", docc: nil, categories: [bootTime], fixtures: [uptimeFixture], selectors: ["systemUptime"]))
 
         let violations = SelfTest.incomplete(rules: rules, rulesDirectory: RulesBundle.directory)
 
@@ -82,7 +73,7 @@ struct SelfTestTests {
 
     @Test("a rule whose fixture file is missing is incomplete")
     func ruleWithMissingFixtureIsIncomplete() throws {
-        let rules = try rulesWith(ApiRule(
+        let rules = try rules(with: ApiRule(
             api: "systemUptime",
             docc: nil,
             categories: [bootTime],
@@ -99,7 +90,7 @@ struct SelfTestTests {
 
     @Test("a rule without binary names makes the self-test run report it incomplete")
     func runReportsIncompleteRule() throws {
-        let rules = try rulesWith(ApiRule(api: "systemUptime", docc: nil, categories: [bootTime], fixtures: [uptimeFixture], usrs: [uptimeUsr]))
+        let rules = try rules(with: ApiRule(api: "systemUptime", docc: nil, categories: [bootTime], fixtures: [uptimeFixture], usrs: [uptimeUsr]))
 
         let incomplete = try SelfTest.run(rules: rules, rulesDirectory: RulesBundle.directory).filter { $0.code == "RULE_INCOMPLETE" }
 
@@ -126,7 +117,7 @@ struct SelfTestTests {
         @Test("a fixture the rule no longer finds is missed in the source lane, every object and every linked library")
         func fixtureWithoutHitIsMissed() throws {
             let build = try #require(CompiledFixtures.current)
-            let rules = try rulesWith(ApiRule(
+            let rules = try rules(with: ApiRule(
                 api: "systemUptime",
                 docc: nil,
                 categories: [bootTime],
@@ -145,7 +136,7 @@ struct SelfTestTests {
         @Test("a rule that also matches another fixture is crosstalk in the source lane and every object")
         func fixtureCrosstalkFails() throws {
             let build = try #require(CompiledFixtures.current)
-            let rules = try rulesWith(
+            let rules = try rules(with: 
                 ApiRule(api: "systemFreeSize", docc: nil, categories: [diskSpace], fixtures: [freeSizeFixture], usrs: [freeSizeUsr], symbols: ["_NSFileSystemFreeSize"]),
                 ApiRule(
                     api: "creationDate",
@@ -168,7 +159,7 @@ struct SelfTestTests {
         @Test("a rule that matches a negative fixture is a negative hit")
         func negativeHitFails() throws {
             let build = try #require(CompiledFixtures.current)
-            let rules = try rulesWith(ApiRule(
+            let rules = try rules(with: ApiRule(
                 api: "systemUptime",
                 docc: nil,
                 categories: [bootTime],

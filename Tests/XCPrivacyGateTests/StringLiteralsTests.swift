@@ -280,8 +280,7 @@ struct StringLiteralsTests {
             var sources: [String: [URL]] = [:]
             for (path, lines) in files.sorted(by: { $0.key < $1.key }) {
                 let file = root.appending(path: path)
-                try FileManager.default.createDirectory(at: file.deletingLastPathComponent(), withIntermediateDirectories: true)
-                try Data(lines.joined(separator: "\n").utf8).write(to: file)
+                try writeFile(lines.joined(separator: "\n"), to: file)
                 sources[String(path.prefix { $0 != "/" }), default: []].append(file)
             }
             let targets = sources.map { PackageTarget(name: $0.key, sources: $0.value, manifest: nil, definesDebugInRelease: debugInRelease.contains($0.key)) }

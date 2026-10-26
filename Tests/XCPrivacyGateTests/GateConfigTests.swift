@@ -12,7 +12,7 @@ struct GateConfigTests {
     @Test("config resolves usage and package paths against its directory")
     func resolvesPathsAgainstItsDirectory() throws {
         try withTemporaryDirectory { root in
-            try makeGitDirectory(in: root)
+            try makeGitCheckout(at: root)
             let url = try writeConfig(
                 #"{"usage": "data/usage.json", "packagePath": "../pkg", "policy": {"userDefaultsAppGroup": true, "trackingDisabled": false}}"#,
                 at: "sub/config.json",
@@ -31,7 +31,7 @@ struct GateConfigTests {
     @Test("packagePath defaults to the repository root")
     func packagePathDefaultsToRepositoryRoot() throws {
         try withTemporaryDirectory { root in
-            try makeGitDirectory(in: root)
+            try makeGitCheckout(at: root)
             let url = try writeConfig(
                 #"{"usage": "usage.json", "policy": {"userDefaultsAppGroup": false, "trackingDisabled": true}}"#,
                 at: ".github/privacy-manifest/config.json",
@@ -50,7 +50,7 @@ struct GateConfigTests {
     @Test("the repository root is the canonical checkout, also when packagePath points below it")
     func repositoryRootIsCheckout() throws {
         try withTemporaryDirectory { root in
-            try makeGitDirectory(in: root)
+            try makeGitCheckout(at: root)
             let url = try writeConfig(
                 #"{"usage": "usage.json", "packagePath": "../../SDK", "policy": {"userDefaultsAppGroup": true, "trackingDisabled": true}}"#,
                 at: ".github/privacy-manifest/config.json",
@@ -68,7 +68,7 @@ struct GateConfigTests {
     func configInCheckoutSubdirectory() throws {
         try withTemporaryDirectory { temporary in
             let checkout = try canonical(temporary).appendingPathComponent("checkout", isDirectory: true)
-            try makeGitDirectory(in: checkout)
+            try makeGitCheckout(at: checkout)
             let url = try writeConfig(configText(setting: "packagePath", to: nil), at: "ci/privacy/config.json", in: checkout)
 
             let config = try GateConfig.load(url)
@@ -83,7 +83,7 @@ struct GateConfigTests {
         try withTemporaryDirectory { temporary in
             let outer = try canonical(temporary).appendingPathComponent("outer", isDirectory: true)
             let inner = outer.appendingPathComponent("inner", isDirectory: true)
-            try makeGitDirectory(in: outer)
+            try makeGitCheckout(at: outer)
             try FileManager.default.createDirectory(at: inner, withIntermediateDirectories: true)
             try Data("gitdir: ../.git/modules/inner\n".utf8).write(to: inner.appendingPathComponent(".git"))
             let url = try writeConfig(configText(setting: "packagePath", to: nil), at: "tools/.github/config.json", in: inner)
@@ -119,7 +119,7 @@ struct GateConfigTests {
     @Test("appleSdkList is read when the config has it and absent when it does not")
     func readsAppleSdkList() throws {
         try withTemporaryDirectory { root in
-            try makeGitDirectory(in: root)
+            try makeGitCheckout(at: root)
             let listed = try GateConfig.load(writeConfig(validConfig, at: "listed.json", in: root))
             let unlisted = try GateConfig.load(writeConfig(configText(setting: "appleSdkList", to: nil), at: "unlisted.json", in: root))
 
@@ -238,14 +238,9 @@ struct GateConfigTests {
         return try #require(error).message
     }
 
-    private func makeGitDirectory(in directory: URL) throws {
-        try FileManager.default.createDirectory(at: directory.appendingPathComponent(".git", isDirectory: true), withIntermediateDirectories: true)
-    }
-
     private func writeConfig(_ text: String, at path: String, in root: URL) throws -> URL {
         let url = root.appendingPathComponent(path)
-        try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
-        try Data(text.utf8).write(to: url)
+        try writeFile(text, to: url)
         return url
     }
 }

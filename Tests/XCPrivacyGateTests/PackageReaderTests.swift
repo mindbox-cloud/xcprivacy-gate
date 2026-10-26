@@ -40,11 +40,7 @@ private func fourTargetPackage(root: URL) -> DescribedPackage {
 
 private func withSampleTree<Result>(_ body: (URL) throws -> Result) throws -> Result {
     try withTemporaryDirectory { root in
-        for name in manifestTargets {
-            let target = root.appendingPathComponent(name, isDirectory: true)
-            try FileManager.default.createDirectory(at: target, withIntermediateDirectories: true)
-            try Data("<plist/>".utf8).write(to: target.appendingPathComponent("PrivacyInfo.xcprivacy"))
-        }
+        try writeFiles(Dictionary(uniqueKeysWithValues: manifestTargets.map { ("\($0)/PrivacyInfo.xcprivacy", "<plist/>") }), to: root)
         return try body(root)
     }
 }
@@ -300,24 +296,16 @@ struct PackageReaderTests {
 
     private func describeAndRead(targets: String, files: [String], in directory: URL) throws -> PackageDescription {
         let package = directory.appendingPathComponent("package", isDirectory: true)
-        let manifest = """
-            // swift-tools-version:5.9
-            import PackageDescription
-
-            let package = Package(
+        let manifest = packageManifest("""
+            Package(
                 name: "Probe",
                 platforms: [.iOS(.v15)],
                 targets: [
                     \(targets)
                 ]
             )
-
-            """
-        for (path, contents) in [("Package.swift", manifest)] + files.map({ ($0, "") }) {
-            let file = package.appendingPathComponent(path)
-            try FileManager.default.createDirectory(at: file.deletingLastPathComponent(), withIntermediateDirectories: true)
-            try Data(contents.utf8).write(to: file)
-        }
+            """)
+        try writeFiles(Dictionary(uniqueKeysWithValues: files.map { ($0, "") }).merging(["Package.swift": manifest]) { $1 }, to: package)
         let link = directory.appendingPathComponent("link", isDirectory: true)
         try FileManager.default.createSymbolicLink(at: link, withDestinationURL: package)
         return try PackageReader.read(description: PackageReader.describe(root: link), dump: PackageReader.dump(root: link))

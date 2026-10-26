@@ -165,17 +165,9 @@ private func appendToTN3181(_ document: NSDictionary, _ block: [String: Any]) th
     try #require(section["content"] as? NSMutableArray).add(block)
 }
 
-private func jsonText(_ object: [String: Any]) throws -> String {
-    try #require(String(bytes: JSONSerialization.data(withJSONObject: object, options: .sortedKeys), encoding: .utf8))
-}
-
 private func makeSampleRepository(usage calls: [[String: String]], appleSdkList: [String: Any]?) throws -> URL {
     let root = try makeTemporaryDirectory()
-    try FileManager.default.createDirectory(at: root.appending(path: ".git", directoryHint: .isDirectory), withIntermediateDirectories: true)
-    var config: [String: Any] = ["usage": "usage.json", "policy": ["userDefaultsAppGroup": true, "trackingDisabled": true]]
-    config["appleSdkList"] = appleSdkList
-    let usage: [String: Any] = ["calls": calls, "privateUserDefaultsSuites": [String](), "overrides": [String]()]
-    try writeFiles([
+    _ = try makeGateRepository(at: root, gateFiles(userDefaultsAppGroup: true, calls: calls, appleSdkList: appleSdkList).merging([
         "Package.swift": packageManifest("""
             Package(
                 name: "Sample",
@@ -189,10 +181,8 @@ private func makeSampleRepository(usage calls: [[String: String]], appleSdkList:
         "Core/Core.swift": "public let core = 1\n",
         "Core/PrivacyInfo.xcprivacy": String(contentsOf: testData("manifests/Core.xcprivacy"), encoding: .utf8),
         "Logger/Logger.swift": "public let logger = 1\n",
-        "Logger/PrivacyInfo.xcprivacy": String(contentsOf: testData("manifests/Logger.xcprivacy"), encoding: .utf8),
-        ".github/privacy-manifest/config.json": jsonText(config),
-        ".github/privacy-manifest/usage.json": jsonText(usage)
-    ], to: root)
+        "Logger/PrivacyInfo.xcprivacy": String(contentsOf: testData("manifests/Logger.xcprivacy"), encoding: .utf8)
+    ]) { $1 })
     return root
 }
 

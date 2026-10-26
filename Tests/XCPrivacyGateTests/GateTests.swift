@@ -23,27 +23,6 @@ private func bootTimeCall(_ api: String, in file: String) -> [String: String] {
     ["module": "Lib", "file": file, "api": api, "reason": "35F9.1", "purpose": "Measure elapsed time"]
 }
 
-private func gateFiles(packagePath: String? = nil, calls: [[String: String]] = [], appleSdkList: [String: Any]? = nil) throws -> [String: String] {
-    var config: [String: Any] = ["usage": "usage.json", "policy": ["userDefaultsAppGroup": false, "trackingDisabled": true]]
-    config["packagePath"] = packagePath
-    config["appleSdkList"] = appleSdkList
-    let usage: [String: Any] = ["calls": calls, "privateUserDefaultsSuites": [String](), "overrides": [String]()]
-    return [
-        ".github/privacy-manifest/config.json": try json(config),
-        ".github/privacy-manifest/usage.json": try json(usage)
-    ]
-}
-
-private func json(_ object: [String: Any]) throws -> String {
-    try #require(String(bytes: JSONSerialization.data(withJSONObject: object, options: .sortedKeys), encoding: .utf8))
-}
-
-private func makeRepository(at root: URL, _ files: [String: String]) throws -> URL {
-    try FileManager.default.createDirectory(at: root.appending(path: ".git", directoryHint: .isDirectory), withIntermediateDirectories: true)
-    try writeFiles(files, to: root)
-    return root.appending(path: ".github/privacy-manifest/config.json")
-}
-
 private func check(_ configFile: URL) throws -> (config: GateConfig, title: String, violations: [Violation]) {
     let config = try GateConfig.load(configFile)
     let result = try Gate.check(
@@ -65,7 +44,7 @@ struct GateTests {
     func violationsExitOne() async throws {
         let root = try makeTemporaryDirectory()
         defer { try? FileManager.default.removeItem(at: root) }
-        let config = try makeRepository(at: root, try gateFiles().merging([
+        let config = try makeGateRepository(at: root, try gateFiles().merging([
             "Package.swift": libPackage,
             "Lib/Clock.swift": clock,
             "Lib/PrivacyInfo.xcprivacy": String(contentsOf: testData("manifests/Logger.xcprivacy"), encoding: .utf8)
@@ -99,7 +78,7 @@ struct GateTests {
     func matchingManifestExitsZero() async throws {
         let root = try makeTemporaryDirectory()
         defer { try? FileManager.default.removeItem(at: root) }
-        let config = try makeRepository(at: root, try gateFiles(calls: [bootTimeCall("mach_absolute_time", in: "Lib/Clock.swift")]).merging([
+        let config = try makeGateRepository(at: root, try gateFiles(calls: [bootTimeCall("mach_absolute_time", in: "Lib/Clock.swift")]).merging([
             "Package.swift": libPackage,
             "Lib/Clock.swift": clock,
             "Lib/PrivacyInfo.xcprivacy": privacyManifest([bootTime: "35F9.1"])
@@ -119,7 +98,7 @@ struct GateTests {
         defer { try? FileManager.default.removeItem(at: root) }
         var files = try gateFiles().merging(["Package.swift": libPackage, "Lib/Clock.swift": clock]) { $1 }
         files[".github/privacy-manifest/usage.json"] = "{"
-        let arguments = ["check", "--config", try makeRepository(at: root, files).path]
+        let arguments = ["check", "--config", try makeGateRepository(at: root, files).path]
 
         let result = try await #require(processExitsWith: .exitCode(2), observing: [\.standardOutputContent, \.standardErrorContent]) { [arguments = arguments as [String]] in
             await runCommand(arguments, stepSummary: nil)
@@ -171,7 +150,7 @@ struct GateTests {
     @Test("a package with an Objective-C target fails with UNSCANNABLE_SOURCE, and package and manifest violations come before the policy ones")
     func objectiveCTargetIsUnscannable() throws {
         try withTemporaryDirectory { root in
-            let configFile = try makeRepository(at: root, try gateFiles().merging([
+            let configFile = try makeGateRepository(at: root, try gateFiles().merging([
                 "Package.swift": packageManifest("""
                     Package(
                         name: "Sample",
@@ -203,7 +182,7 @@ struct GateTests {
     func bundledAppleListNamesConfiguredSdk() throws {
         let listed = try #require(SDKList.read(RulesBundle.directory.appending(path: SDKList.fileName)).first)
         try withTemporaryDirectory { root in
-            let configFile = try makeRepository(at: root, try gateFiles(appleSdkList: ["name": listed, "listed": false]).merging([
+            let configFile = try makeGateRepository(at: root, try gateFiles(appleSdkList: ["name": listed, "listed": false]).merging([
                 "Package.swift": libPackage,
                 "Lib/Clock.swift": clock,
                 "Lib/PrivacyInfo.xcprivacy": privacyManifest([bootTime: "35F9.1"])
@@ -224,7 +203,7 @@ struct GateTests {
             try FileManager.default.createDirectory(at: repository, withIntermediateDirectories: true)
             try FileManager.default.createSymbolicLink(at: root, withDestinationURL: repository)
             let source = clock + "\npublic let uptimeKey = \"systemUptime\"\n"
-            let configFile = try makeRepository(at: root, try gateFiles(
+            let configFile = try makeGateRepository(at: root, try gateFiles(
                 packagePath: "../../SDK",
                 calls: [bootTimeCall("mach_absolute_time", in: "SDK/Lib/Clock.swift"), bootTimeCall("systemUptime", in: "SDK/Lib/Clock.swift")]
             ).merging([
