@@ -17,15 +17,17 @@ package enum PlistReadError: Error {
 }
 
 package enum PlistReader {
+    private static let xmlWhitespace: Set<UInt8> = [0x20, 0x09, 0x0D, 0x0A]
+
     package static func read(_ data: Data) throws(PlistReadError) -> PlistValue {
-        if !data.starts(with: Data("bplist".utf8)) {
-            try XMLKeyCheck(data).run()
-        }
         let object: Any
         do {
             object = try PropertyListSerialization.propertyList(from: data, format: nil)
         } catch {
             throw .invalid((error as NSError).userInfo[NSDebugDescriptionErrorKey] as? String ?? error.localizedDescription)
+        }
+        if !data.starts(with: Data("bplist".utf8)) {
+            try XMLKeyCheck(data.drop { xmlWhitespace.contains($0) }).run()
         }
         return try value(of: object)
     }
@@ -69,8 +71,9 @@ private final class XMLKeyCheck: NSObject, XMLParserDelegate {
     }
 
     func run() throws(PlistReadError) {
-        guard parser.parse() else {
-            throw failure ?? .invalid("the XML parser stopped")
+        parser.parse()
+        if let failure {
+            throw failure
         }
     }
 
@@ -110,11 +113,6 @@ private final class XMLKeyCheck: NSObject, XMLParserDelegate {
 
     func parser(_ parser: XMLParser, foundCDATA CDATABlock: Data) {
         key? += String(bytes: CDATABlock, encoding: .utf8) ?? ""
-    }
-
-    func parser(_ parser: XMLParser, parseErrorOccurred parseError: any Error) {
-        let message = (parseError as NSError).userInfo["NSXMLParserErrorMessage"] as? String ?? parseError.localizedDescription
-        fail(.invalid("\(message.trimmingCharacters(in: .whitespacesAndNewlines)): line \(parser.lineNumber), column \(parser.columnNumber)"))
     }
 
     private func closeKey() {
