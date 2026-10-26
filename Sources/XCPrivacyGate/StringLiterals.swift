@@ -45,7 +45,7 @@ package enum StringLiterals {
 
 private final class LiteralCollector: SyntaxVisitor {
     private let converter: SourceLocationConverter
-    private let lanes: [ShippedBuildLane]
+    private var lanes: [ShippedBuildLane]
     private(set) var literals: [(value: String, line: Int)] = []
 
     init(converter: SourceLocationConverter, lanes: [ShippedBuildLane]) {
@@ -62,20 +62,28 @@ private final class LiteralCollector: SyntaxVisitor {
     }
 
     override func visit(_ node: IfConfigDeclSyntax) -> SyntaxVisitorContinueKind {
-        guard !VersionCheckFinder.checksVersion(node) else {
-            return .visitChildren
-        }
-        let outcomes = lanes.map { node.activeClause(in: $0) }
-        guard outcomes.allSatisfy({ $0.diagnostics.isEmpty }) else {
-            return .visitChildren
-        }
-        let shipped = Set(outcomes.compactMap(\.clause))
-        for clause in node.clauses where shipped.contains(clause) {
-            if let elements = clause.elements {
-                walk(elements)
+        let reaching = lanes
+        let checksVersion = VersionCheckFinder.checksVersion(node)
+        var lanesByClause: [IfConfigClauseSyntax: [ShippedBuildLane]] = [:]
+        for lane in reaching {
+            for clause in Self.clauses(of: node, reachedBy: lane, keepingEvery: checksVersion) {
+                lanesByClause[clause, default: []].append(lane)
             }
         }
+        for clause in node.clauses {
+            guard let clauseLanes = lanesByClause[clause], let elements = clause.elements else { continue }
+            lanes = clauseLanes
+            walk(elements)
+        }
+        lanes = reaching
         return .skipChildren
+    }
+
+    private static func clauses(of node: IfConfigDeclSyntax, reachedBy lane: ShippedBuildLane, keepingEvery: Bool) -> [IfConfigClauseSyntax] {
+        guard !keepingEvery else { return Array(node.clauses) }
+        let outcome = node.activeClause(in: lane)
+        guard outcome.diagnostics.isEmpty else { return Array(node.clauses) }
+        return outcome.clause.map { [$0] } ?? []
     }
 }
 
