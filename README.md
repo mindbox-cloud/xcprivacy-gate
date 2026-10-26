@@ -208,7 +208,7 @@ Releases follow [Semantic Versioning](https://semver.org) with tags `v<MAJOR>.<M
   turn a passing repository red.
 - PATCH: fixes that add no failures.
 
-The release notes name the date the Apple rules last changed. Read them before you move the pinned commit.
+The release notes name the date the rules last changed. Read them before you move the pinned commit.
 
 ## Releasing
 
