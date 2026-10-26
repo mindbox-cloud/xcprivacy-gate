@@ -207,6 +207,13 @@ struct ManifestValidatorTests {
         #expect(try codes("<plist><dict><key>NSPrivacyTracking</dict>") == ["MANIFEST_UNREADABLE"])
     }
 
+    @Test("a top level that is not a dictionary is unreadable and named by its plist type", arguments: [("<array/>", "array"), ("<true/>", "boolean"), ("<integer>1</integer>", "integer")])
+    func topLevelOtherThanDictionaryIsNamedByPlistType(root: String, type: String) throws {
+        let message = try message(of: "MANIFEST_UNREADABLE", in: header + root + "</plist>\n")
+
+        #expect(message.hasSuffix("top level is of type \(type), expected dictionary"))
+    }
+
     @Test("tracking may be true when trackingDisabled is off")
     func trackingMayBeTrueWhenTrackingDisabledIsOff() throws {
         let trackedEntry = diagnostics.replacing(
