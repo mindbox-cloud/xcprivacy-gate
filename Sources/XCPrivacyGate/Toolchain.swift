@@ -5,12 +5,24 @@ package enum Toolchain {
     private static let stderrTailLength = 2_000
 
     package static func libIndexStore() throws -> URL {
-        let swift = try URL(fileURLWithPath: run(["xcrun", "--find", "swift"]).trimmingCharacters(in: .whitespacesAndNewlines))
+        let swift = try URL(fileURLWithPath: find("swift"))
         let library = swift.deletingLastPathComponent().appending(path: "../lib/libIndexStore.dylib").standardized
         guard FileManager.default.fileExists(atPath: library.path) else {
             throw ToolError(message: "\(library.path) does not exist: the selected toolchain cannot read the build index")
         }
         return library
+    }
+
+    static func find(_ tool: String) throws -> String {
+        try trimmedOutput(of: ["xcrun", "--find", tool])
+    }
+
+    static func sdkPath(_ sdk: String) throws -> String {
+        try trimmedOutput(of: ["xcrun", "--sdk", sdk, "--show-sdk-path"])
+    }
+
+    private static func trimmedOutput(of arguments: [String]) throws -> String {
+        try run(arguments).trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
     package static func run(_ arguments: [String]) throws -> String {

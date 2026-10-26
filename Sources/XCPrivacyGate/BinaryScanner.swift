@@ -65,13 +65,9 @@ private struct BinaryTools {
     private let demangler: String
 
     init() throws {
-        nm = try Self.find("nm")
-        otool = try Self.find("otool")
-        demangler = try Self.find("swift-demangle")
-    }
-
-    private static func find(_ tool: String) throws -> String {
-        try Toolchain.run(["xcrun", "--find", tool]).trimmingCharacters(in: .whitespacesAndNewlines)
+        nm = try Toolchain.find("nm")
+        otool = try Toolchain.find("otool")
+        demangler = try Toolchain.find("swift-demangle")
     }
 
     func evidence(of file: URL) throws -> BinaryEvidence {

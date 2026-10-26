@@ -21,7 +21,7 @@ package enum PackageBuilder {
             indexStore: work.appending(path: "index", directoryHint: .isDirectory),
             products: scratch.appending(path: "out/Products/Release-iphoneos", directoryHint: .isDirectory)
         )
-        let sdk = try Toolchain.run(["xcrun", "--sdk", "iphoneos", "--show-sdk-path"]).trimmingCharacters(in: .whitespacesAndNewlines)
+        let sdk = try Toolchain.sdkPath("iphoneos")
         let command = [
             "swift", "build", "--package-path", root.path, "--scratch-path", scratch.path, "--build-system", "swiftbuild",
             "--triple", "arm64-apple-ios", "--sdk", sdk, "-c", "release", "--force-resolved-versions",

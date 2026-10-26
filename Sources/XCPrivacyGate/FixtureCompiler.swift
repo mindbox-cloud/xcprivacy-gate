@@ -28,10 +28,10 @@ struct FixtureCompiler {
     private let platforms: [FixturePlatform]
 
     init() throws {
-        swiftc = try Self.output(of: ["xcrun", "--find", "swiftc"])
+        swiftc = try Toolchain.find("swiftc")
         var sdkPaths: [String: String] = [:]
         platforms = try Self.targets.map { target in
-            let sdkPath = try sdkPaths[target.sdk] ?? Self.output(of: ["xcrun", "--sdk", target.sdk, "--show-sdk-path"])
+            let sdkPath = try sdkPaths[target.sdk] ?? Toolchain.sdkPath(target.sdk)
             sdkPaths[target.sdk] = sdkPath
             return FixturePlatform(triple: target.triple, sdk: target.sdk, sdkPath: sdkPath)
         }
@@ -61,9 +61,5 @@ struct FixtureCompiler {
 
     private func command(for platform: FixturePlatform) -> [String] {
         [swiftc, "-sdk", platform.sdkPath, "-target", platform.triple]
-    }
-
-    private static func output(of command: [String]) throws -> String {
-        try Toolchain.run(command).trimmingCharacters(in: .whitespacesAndNewlines)
     }
 }
