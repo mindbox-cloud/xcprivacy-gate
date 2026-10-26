@@ -157,7 +157,7 @@ struct GateConfigTests {
     }
 
     @Test(
-        "a value of the wrong type is a tool error naming the key",
+        "a value of the wrong type, or a blank SDK name, is a tool error naming the key",
         arguments: [
             ("usage", "5"),
             ("packagePath", "true"),
@@ -169,6 +169,7 @@ struct GateConfigTests {
             ("appleSdkList", "true"),
             ("appleSdkList", "null"),
             ("appleSdkList.name", "1"),
+            ("appleSdkList.name", "\" \""),
             ("appleSdkList.listed", "\"false\"")
         ]
     )
@@ -177,6 +178,22 @@ struct GateConfigTests {
             let url = try writeConfig(try configText(setting: key, to: value), at: ".github/config.json", in: root)
 
             #expect(try loadErrorMessage(url).contains("\"\(key)\""))
+        }
+    }
+
+    @Test("a packagePath outside the config's git checkout is a tool error naming it", arguments: ["../../sdk", "../linked"])
+    func packagePathOutsideCheckoutIsAnError(packagePath: String) throws {
+        try withTemporaryDirectory { root in
+            let checkout = root.appendingPathComponent("checkout", isDirectory: true)
+            try makeGitCheckout(at: checkout)
+            try FileManager.default.createDirectory(at: root.appendingPathComponent("sdk"), withIntermediateDirectories: true)
+            try FileManager.default.createSymbolicLink(atPath: checkout.appendingPathComponent("linked").path, withDestinationPath: "../sdk")
+            let url = try writeConfig(configText(setting: "packagePath", to: "\"\(packagePath)\""), at: ".github/config.json", in: checkout)
+
+            let message = try loadErrorMessage(url)
+
+            #expect(message.contains("\"packagePath\""))
+            #expect(message.contains("outside the git checkout"))
         }
     }
 
