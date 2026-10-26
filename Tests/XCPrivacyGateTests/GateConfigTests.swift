@@ -10,6 +10,7 @@ struct GateConfigTests {
     @Test("config resolves usage and package paths against its directory")
     func resolvesPathsAgainstItsDirectory() throws {
         try withTemporaryDirectory { root in
+            try makeGitDirectory(in: root)
             let url = try writeConfig(
                 #"{"usage": "data/usage.json", "packagePath": "../pkg", "policy": {"userDefaultsAppGroup": true, "trackingDisabled": false}}"#,
                 at: "sub/config.json",
@@ -25,9 +26,10 @@ struct GateConfigTests {
         }
     }
 
-    @Test("packagePath defaults to the directory that holds .github")
+    @Test("packagePath defaults to the repository root")
     func packagePathDefaultsToRepositoryRoot() throws {
         try withTemporaryDirectory { root in
+            try makeGitDirectory(in: root)
             let url = try writeConfig(
                 #"{"usage": "usage.json", "policy": {"userDefaultsAppGroup": false, "trackingDisabled": true}}"#,
                 at: ".github/privacy-manifest/config.json",
@@ -36,44 +38,17 @@ struct GateConfigTests {
 
             let config = try GateConfig.load(url)
 
-            #expect(config.packagePath.path == root.standardizedFileURL.path)
+            #expect(try config.packagePath.path == canonical(root).path)
             #expect(config.usage.path == root.appendingPathComponent(".github/privacy-manifest/usage.json").standardizedFileURL.path)
             #expect(!config.userDefaultsAppGroup)
             #expect(config.trackingDisabled)
         }
     }
 
-    @Test("the nearest .github ancestor decides the default package path")
-    func nearestGithubAncestorDecidesDefault() throws {
+    @Test("the repository root is the canonical checkout, also when packagePath points below it")
+    func repositoryRootIsCheckout() throws {
         try withTemporaryDirectory { root in
-            let url = try writeConfig(
-                #"{"usage": "usage.json", "policy": {"userDefaultsAppGroup": true, "trackingDisabled": true}}"#,
-                at: ".github/tools/.github/config.json",
-                in: root
-            )
-
-            let config = try GateConfig.load(url)
-
-            #expect(config.packagePath.path == root.appendingPathComponent(".github/tools").standardizedFileURL.path)
-        }
-    }
-
-    @Test("an absent packagePath outside a .github directory is a tool error naming it")
-    func absentPackagePathOutsideGithubIsAnError() throws {
-        try withTemporaryDirectory { root in
-            let url = try writeConfig(
-                try configText(setting: "packagePath", to: nil),
-                at: "config/config.json",
-                in: root
-            )
-
-            #expect(try loadErrorMessage(url).contains("\"packagePath\""))
-        }
-    }
-
-    @Test("the repository root is the canonical directory that holds .github, also when packagePath points below it")
-    func repositoryRootHoldsGithub() throws {
-        try withTemporaryDirectory { root in
+            try makeGitDirectory(in: root)
             let url = try writeConfig(
                 #"{"usage": "usage.json", "packagePath": "../../SDK", "policy": {"userDefaultsAppGroup": true, "trackingDisabled": true}}"#,
                 at: ".github/privacy-manifest/config.json",
@@ -84,19 +59,6 @@ struct GateConfigTests {
 
             #expect(try config.repositoryRoot.path == canonical(root).path)
             #expect(config.packagePath.path == root.appendingPathComponent("SDK").standardizedFileURL.path)
-        }
-    }
-
-    @Test("without a .github directory the repository root is the canonical package path")
-    func repositoryRootWithoutGithubIsPackagePath() throws {
-        try withTemporaryDirectory { root in
-            let package = root.appendingPathComponent("pkg", isDirectory: true)
-            try FileManager.default.createDirectory(at: package, withIntermediateDirectories: true)
-            let url = try writeConfig(validConfig.replacingOccurrences(of: #""packagePath": ".""#, with: #""packagePath": "../pkg""#), at: "config/config.json", in: root)
-
-            let config = try GateConfig.load(url)
-
-            #expect(try config.repositoryRoot.path == canonical(package).path)
         }
     }
 
@@ -202,6 +164,10 @@ struct GateConfigTests {
     private func loadErrorMessage(_ url: URL) throws -> String {
         let error = #expect(throws: ToolError.self) { try GateConfig.load(url) }
         return try #require(error).message
+    }
+
+    private func makeGitDirectory(in directory: URL) throws {
+        try FileManager.default.createDirectory(at: directory.appendingPathComponent(".git", isDirectory: true), withIntermediateDirectories: true)
     }
 
     private func writeConfig(_ text: String, at path: String, in root: URL) throws -> URL {

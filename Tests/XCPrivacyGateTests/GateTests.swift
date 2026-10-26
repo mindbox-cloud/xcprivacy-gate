@@ -40,6 +40,7 @@ private func json(_ object: [String: Any]) throws -> String {
 }
 
 private func makeRepository(at root: URL, _ files: [String: String]) throws -> URL {
+    try FileManager.default.createDirectory(at: root.appending(path: ".git", directoryHint: .isDirectory), withIntermediateDirectories: true)
     try writeFiles(files, to: root)
     return root.appending(path: ".github/privacy-manifest/config.json")
 }

@@ -19,13 +19,9 @@ package struct GateConfig: Equatable, Sendable {
     private init(file: URL) throws {
         let raw = try RawConfig(contentsOf: file)
         let directory = file.deletingLastPathComponent()
-        let repository = Self.directoryHoldingGithub(above: directory)
-        guard let packagePath = raw.packagePath.map({ Self.resolve($0, against: directory, isDirectory: true) }) ?? repository else {
-            throw ToolError(message: "key \"packagePath\" is absent and the config is not under a .github directory")
-        }
+        repositoryRoot = try Self.checkout(containing: directory)
         usage = Self.resolve(raw.usage, against: directory, isDirectory: false)
-        self.packagePath = packagePath
-        repositoryRoot = URL(fileURLWithPath: (repository ?? packagePath).canonicalPath, isDirectory: true)
+        packagePath = raw.packagePath.map { Self.resolve($0, against: directory, isDirectory: true) } ?? repositoryRoot
         userDefaultsAppGroup = raw.policy.userDefaultsAppGroup
         trackingDisabled = raw.policy.trackingDisabled
     }
@@ -34,12 +30,13 @@ package struct GateConfig: Equatable, Sendable {
         URL(fileURLWithPath: path, isDirectory: isDirectory, relativeTo: directory).standardizedFileURL
     }
 
-    private static func directoryHoldingGithub(above directory: URL) -> URL? {
-        let components = directory.pathComponents
-        guard let index = components.lastIndex(of: ".github") else {
-            return nil
+    private static func checkout(containing directory: URL) throws -> URL {
+        let components = URL(fileURLWithPath: directory.canonicalPath, isDirectory: true).pathComponents
+        let ancestors = components.indices.reversed().map { NSString.path(withComponents: Array(components[...$0])) }
+        guard let root = ancestors.first(where: { FileManager.default.fileExists(atPath: NSString.path(withComponents: [$0, ".git"])) }) else {
+            throw ToolError(message: "the config must live inside a git checkout, but no directory above it holds a .git entry")
         }
-        return URL(fileURLWithPath: NSString.path(withComponents: Array(components[..<index])), isDirectory: true)
+        return URL(fileURLWithPath: root, isDirectory: true)
     }
 }
 
