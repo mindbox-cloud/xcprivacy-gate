@@ -6,7 +6,6 @@ included: # paths to include during linting. `--path` is ignored if present.
 excluded: # paths to ignore during linting. Takes precedence over `included`.
   - Rules/fixtures
   - Tests/XCPrivacyGateTests/Data
-  - .build
 
 only_rules: # default rules
   - blanket_disable_command
