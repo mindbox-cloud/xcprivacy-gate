@@ -96,7 +96,7 @@ comment, as above.
 | Key | Required | Meaning |
 |---|---|---|
 | `usage` | yes | the path of `usage.json`, relative to the config |
-| `packagePath` | no | the directory that holds `Package.swift`, relative to the config; by default the root of the git checkout that holds the config |
+| `packagePath` | no | the directory that holds `Package.swift`, relative to the config and inside the git checkout that holds the config; by default the root of that checkout |
 | `policy.userDefaultsAppGroup` | yes | `true`: UserDefaults follows a fixed policy instead of `usage.json`. Any use needs `1C8F.1`, because the SDK keeps its data in an App Group suite; `UserDefaults.standard` or a suite listed in `privateUserDefaultsSuites` also needs `CA92.1`; no other UserDefaults reason is allowed. `false`: UserDefaults calls are registered like any other API |
 | `policy.trackingDisabled` | yes | `true`: every manifest declares `NSPrivacyTracking` as `false`, lists no tracking domains and no tracked data |
 | `appleSdkList` | no | `name` and `listed`: whether Apple's [list of SDKs that require a privacy manifest and signature](https://developer.apple.com/support/third-party-SDK-requirements/) names this SDK, as you last reviewed it. Only `refresh --check` reads it and compares it with the live page; `check` ignores it |

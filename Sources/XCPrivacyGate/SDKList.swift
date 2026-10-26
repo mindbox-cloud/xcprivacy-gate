@@ -14,6 +14,9 @@ package struct AppleSDKListing: Sendable, Decodable {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         name = try container.decode(String.self, forKey: .name)
         listed = try container.decode(Bool.self, forKey: .listed)
+        if name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            throw ToolError(message: "\"appleSdkList.name\" must name the SDK, found a blank string")
+        }
     }
 }
 
