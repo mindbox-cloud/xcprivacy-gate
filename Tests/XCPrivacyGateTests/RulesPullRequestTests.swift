@@ -6,6 +6,7 @@ private let title = "feat: refresh Apple privacy rules"
 private let script = repositoryRoot.appending(path: "scripts/rules-pr.sh")
 
 private let ownPullRequest = #"[{"number": 7, "isCrossRepository": false}]"#
+private let forkPullRequest = #"[{"number": 5, "isCrossRepository": true}]"#
 
 private let fakeGh = """
     #!/bin/sh
@@ -185,6 +186,29 @@ struct RulesPullRequestTests {
         try repository.runScript(line: "v3", openPullRequests: ownPullRequest)
 
         #expect(try repository.subjects(branch).prefix(3) == [title, "Add the fixture for the new API", title])
+        #expect(try repository.remoteRules(branch) == "v1\nv3\n")
+        #expect(try repository.log("gh.log").contains { $0.hasPrefix("pr comment 7 --body-file ") })
+    }
+
+    @Test("a fork's pull request with the rules branch name is ignored, and the run opens a pull request from main")
+    func forkPullRequestIsIgnored() throws {
+        let repository = try RulesPullRequestRepository()
+        defer { repository.remove() }
+
+        try repository.runScript(line: "v2", openPullRequests: forkPullRequest)
+
+        #expect(try repository.subjects(branch) == [title, "Main"])
+        #expect(try repository.log("gh.log").contains { $0.hasPrefix("pr create --base main --head \(branch) ") })
+    }
+
+    @Test("the repository's own open pull request gets the comment while a fork's pull request has the same branch name")
+    func ownPullRequestIsCommentedBesideFork() throws {
+        let repository = try RulesPullRequestRepository()
+        defer { repository.remove() }
+        try repository.pushBranch([title])
+
+        try repository.runScript(line: "v3", openPullRequests: #"[{"number": 5, "isCrossRepository": true}, {"number": 7, "isCrossRepository": false}]"#)
+
         #expect(try repository.remoteRules(branch) == "v1\nv3\n")
         #expect(try repository.log("gh.log").contains { $0.hasPrefix("pr comment 7 --body-file ") })
     }
