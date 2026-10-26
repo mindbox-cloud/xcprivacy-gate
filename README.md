@@ -167,7 +167,7 @@ summary is also appended to the job summary.
 |---|---|
 | `MISSING_CATEGORY` | the code uses a category the manifest does not declare |
 | `EXTRA_CATEGORY` | the manifest declares a category no code uses; remove it, or add an override with evidence |
-| `UNREGISTERED_CALL` | a call has no entry in `usage.json` for its file; the message lists Apple's reasons |
+| `UNREGISTERED_CALL` | a call has no entry in `usage.json` for its file; the message lists the codes of Apple's reasons for its category |
 | `STALE_ENTRY` | an entry points at a call that is gone |
 | `LIKELY_MOVE` | a registered call moved to another file |
 | `REASONS_MISMATCH` | the manifest's reasons differ from the registered ones |

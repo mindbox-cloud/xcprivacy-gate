@@ -66,7 +66,7 @@ struct GateTests {
         let output = try text(result.standardOutputContent)
         let annotations = output.split(separator: "\n").filter { $0.hasPrefix("::error ") }.map { $0.components(separatedBy: "::")[1] }
         #expect(annotations == [
-            "error file=Lib/PrivacyInfo.xcprivacy,title=EXTRA_CATEGORY",
+            "error file=Lib/PrivacyInfo.xcprivacy,line=39,title=EXTRA_CATEGORY",
             "error file=Lib/PrivacyInfo.xcprivacy,title=MISSING_CATEGORY",
             "error file=Lib/Clock.swift,line=3,title=UNREGISTERED_CALL"
         ])
@@ -77,7 +77,7 @@ struct GateTests {
         let step = try String(contentsOf: summary, encoding: .utf8)
         #expect(step.hasPrefix("previous step\n### Privacy manifest gate, check of Sample: 3 violations\n\n- `EXTRA_CATEGORY` Lib: "))
         #expect(step.split(separator: "\n").filter { $0.hasPrefix("- `") }.count == 3)
-        #expect(step.hasSuffix(".\n\n"))
+        #expect(step.hasSuffix("/nsprivacyaccessedapitypes/nsprivacyaccessedapitype\n\n"))
     }
 
     @Test("check exits 0 with only the summary when the manifest and usage.json match the code")
@@ -374,8 +374,8 @@ struct GateTests {
             let (config, _, violations) = try check(configFile)
 
             #expect(violations.map { Report.annotation($0, root: config.repositoryRoot) } == [
-                "::error file=SDK/Lib/PrivacyInfo.xcprivacy,title=EXTRA_CATEGORY::Lib: the manifest declares \(userDefaults), but no code in the module uses it. "
-                    + "Remove the entry, or add an override with evidence to usage.json if Apple requires it"
+                "::error file=SDK/Lib/PrivacyInfo.xcprivacy,line=2,title=EXTRA_CATEGORY::Lib: the manifest declares \(userDefaults), but no code in the module uses it. "
+                    + "Remove the entry, and the NSPrivacyAccessedAPITypes key with its last entry (TN3181), or add an override with evidence to usage.json if Apple requires it"
             ])
         }
     }

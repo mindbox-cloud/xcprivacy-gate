@@ -27,8 +27,8 @@ private func target(_ name: String, manifest: Bool = true) -> PackageTarget {
     )
 }
 
-private func manifest(_ apiTypes: [String: [String]]) -> Manifest {
-    Manifest(path: URL(fileURLWithPath: "/package/Core/PrivacyInfo.xcprivacy"), apiTypes: apiTypes)
+private func manifest(_ apiTypes: [String: [String]], lines: [String: Int] = [:]) -> Manifest {
+    Manifest(path: URL(fileURLWithPath: "/package/Core/PrivacyInfo.xcprivacy"), apiTypes: apiTypes, categoryLines: lines)
 }
 
 private func finding(_ api: String, _ categories: Set<String>, file: String = "Core/Foo.swift", line: Int = 1, evidence: String? = nil) -> Finding {
@@ -80,21 +80,24 @@ struct PolicyTests {
         #expect(message.contains("35F9.1"))
     }
 
-    @Test("a declared category no code uses is EXTRA_CATEGORY")
-    func extraCategoryIsReported() {
-        #expect(codes(evaluate(uses(), declares: [bootTime: ["35F9.1"]])) == ["EXTRA_CATEGORY"])
+    @Test("a declared category no code uses is EXTRA_CATEGORY at its entry, and the message says to drop the key with its last entry")
+    func extraCategoryIsReported() throws {
+        let violations = policy(registry()).evaluate(targets: [target("Core")], source: ["Core": uses()], binary: [:], manifests: ["Core": manifest([bootTime: ["35F9.1"]], lines: [bootTime: 9])])
+
+        #expect(codes(violations) == ["EXTRA_CATEGORY"])
+        #expect(violations.first?.line == 9)
+        #expect(violations.first?.message == "Core: the manifest declares \(bootTime), but no code in the module uses it. Remove the entry, and the "
+            + "NSPrivacyAccessedAPITypes key with its last entry (TN3181), or add an override with evidence to usage.json if Apple requires it")
     }
 
-    @Test("an unregistered call points at its line and lists Apple's reasons with their texts")
+    @Test("an unregistered call points at its line and names the reason codes, the reasons the manifest declares and Apple's page")
     func unregisteredCallListsReasons() throws {
         let violations = evaluate(uses(finding("mach_absolute_time", [bootTime], line: 12)), declares: [bootTime: ["35F9.1"]])
 
-        #expect(codes(violations) == ["UNREGISTERED_CALL"])
-        let violation = try #require(violations.first)
-        #expect(violation.file == "Core/Foo.swift")
-        #expect(violation.line == 12)
-        #expect(violation.message.contains("35F9.1"))
-        #expect(violation.message.contains("measure the amount of time"))
+        #expect(violations.map { "\($0.code) \($0.file ?? "") \($0.line ?? 0)" } == ["UNREGISTERED_CALL Core/Foo.swift 12"])
+        #expect(violations.first?.message == "Core: Core/Foo.swift:12 uses mach_absolute_time (\(bootTime)), and usage.json has no entry for it in this file. Add an entry "
+            + "with module, file, api, purpose and one of Apple's reasons for the category: 35F9.1, 3D61.1, 8FFB.1; the manifest declares 35F9.1. See "
+            + "https://developer.apple.com/documentation/bundleresources/app-privacy-configuration/nsprivacyaccessedapitypes/nsprivacyaccessedapitype")
     }
 
     @Test("an entry without its call is STALE_ENTRY")
@@ -304,16 +307,19 @@ struct PolicyTests {
         #expect(codes(evaluate(found, declares: [userDefaults: ["CA92.1"]], userDefaultsAppGroup: false)) == ["UNREGISTERED_CALL"])
     }
 
-    @Test("a target without a manifest that uses an API is reported")
+    @Test("a target without a manifest that uses an API is reported at its first use in source, with each category it needs")
     func targetWithoutManifestUsingApiIsReported() {
         let violations = policy(registry()).evaluate(
             targets: [target("BuildInfo", manifest: false)],
-            source: [:],
+            source: ["BuildInfo": uses(finding("UserDefaults", [userDefaults], file: "BuildInfo/B.swift", line: 7), finding("UserDefaults", [userDefaults], file: "BuildInfo/A.swift", line: 3))],
             binary: ["BuildInfo": uses(compiled("mach_absolute_time", [bootTime]))],
             manifests: [:]
         )
 
-        #expect(codes(violations) == ["TARGET_WITHOUT_MANIFEST_USES_API"])
+        #expect(violations.map { "\($0.code) \($0.file ?? "") \($0.line ?? 0)" } == ["TARGET_WITHOUT_MANIFEST_USES_API BuildInfo/A.swift 3"])
+        #expect(violations.first?.message == "BuildInfo: the build ships no PrivacyInfo.xcprivacy for the target, but it uses \(bootTime) (mach_absolute_time: mach_absolute_time in Core.o), "
+            + "\(userDefaults) (UserDefaults at BuildInfo/A.swift:3, UserDefaults at BuildInfo/B.swift:7). Put a manifest that declares these categories in the "
+            + "target's directory and list it in resources: in Package.swift (swift-tools-version 5.3 or later)")
     }
 
     @Test("a live override allows a category without a call")
@@ -455,7 +461,7 @@ struct PolicyTests {
             "Core UNREGISTERED_CALL Core/A.swift",
             "Core UNREGISTERED_CALL Core/B.swift",
             "Ghost REGISTRY_UNKNOWN_MODULE ",
-            "Helper TARGET_WITHOUT_MANIFEST_USES_API "
+            "Helper TARGET_WITHOUT_MANIFEST_USES_API Helper/Clock.swift"
         ])
     }
 

@@ -34,13 +34,13 @@ package enum SDKList {
             throw ToolError(message: "\(ApplePage.sdkList.address) is not readable HTML: \(error.localizedDescription)")
         }
         guard try !document.nodes(forXPath: "//\(headingElements)").isEmpty else {
-            throw ToolError(message: "\(ApplePage.sdkList.address) no longer has the heading \(heading.pythonRepr)")
+            throw ToolError(message: "\(ApplePage.sdkList.address) no longer has the heading \(heading.quoted)")
         }
         let names = try document.nodes(forXPath: "(//\(headingElements))[1]/following-sibling::ul[1]/li")
             .map { ($0.stringValue ?? "").split(whereSeparator: \.isWhitespace).joined(separator: " ") }
             .filter { !$0.isEmpty }
         guard !names.isEmpty else {
-            throw ToolError(message: "\(ApplePage.sdkList.address) lists no SDKs under \(heading.pythonRepr)")
+            throw ToolError(message: "\(ApplePage.sdkList.address) lists no SDKs under \(heading.quoted)")
         }
         return names
     }

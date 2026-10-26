@@ -30,7 +30,7 @@ struct UsageTests {
     func unknownApiIsAnError() throws {
         let call = #"{"module": "Core", "file": "a.swift", "api": "uptime", "reason": "35F9.1", "purpose": "x"}"#
 
-        #expect(try loadErrorMessage(document(calls: "[\(call)]")).contains("'uptime'"))
+        #expect(try loadErrorMessage(document(calls: "[\(call)]")).contains("\"uptime\""))
     }
 
     @Test("a UserDefaults entry is a tool error under the App Group policy")

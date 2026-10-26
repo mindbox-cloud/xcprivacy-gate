@@ -53,7 +53,7 @@ package enum PackageReader {
             Violation(
                 code: "PACKAGE_DEPENDENCY",
                 module: nil,
-                message: "package dependency \(dependency.identity.pythonRepr): its code is invisible to the source scan"
+                message: "package dependency \(dependency.identity.quoted): its code is invisible to the source scan"
             )
         }
         var targets: [PackageTarget] = []
@@ -68,7 +68,7 @@ package enum PackageReader {
                 violations.append(Violation(
                     code: "PACKAGE_DEPENDENCY",
                     module: target.name,
-                    message: "binary target \(target.name.pythonRepr): its code is invisible to the source scan"
+                    message: "binary target \(target.name.quoted): its code is invisible to the source scan"
                 ))
             default:
                 break

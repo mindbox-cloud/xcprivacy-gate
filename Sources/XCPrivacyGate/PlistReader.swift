@@ -11,25 +11,37 @@ package enum PlistValue: Sendable {
     case data(String)
 }
 
+package enum PlistPathComponent: Hashable, Sendable {
+    case key(String)
+    case index(Int)
+}
+
+package struct PlistDocument: Sendable {
+    package let root: PlistValue
+    package let lines: [[PlistPathComponent]: Int]
+}
+
 package enum PlistReadError: Error {
-    case duplicateKey(String)
+    case duplicateKey(String, line: Int)
     case invalid(String)
 }
 
 package enum PlistReader {
     private static let xmlWhitespace: Set<UInt8> = [0x20, 0x09, 0x0D, 0x0A]
 
-    package static func read(_ data: Data) throws(PlistReadError) -> PlistValue {
+    package static func read(_ data: Data) throws(PlistReadError) -> PlistDocument {
         let object: Any
         do {
             object = try PropertyListSerialization.propertyList(from: data, format: nil)
         } catch {
             throw .invalid((error as NSError).userInfo[NSDebugDescriptionErrorKey] as? String ?? error.localizedDescription)
         }
+        var lines: [[PlistPathComponent]: Int] = [:]
         if !data.starts(with: Data("bplist".utf8)) {
-            try XMLKeyCheck(data.drop { xmlWhitespace.contains($0) }).run()
+            let leading = data.prefix { xmlWhitespace.contains($0) }
+            lines = try XMLStructure(data.dropFirst(leading.count), firstLine: 1 + leading.count(where: { $0 == 0x0A })).lines()
         }
-        return try value(of: object)
+        return PlistDocument(root: try value(of: object), lines: lines)
     }
 
     private static func value(of object: Any) throws(PlistReadError) -> PlistValue {
@@ -58,23 +70,34 @@ package enum PlistReader {
     }
 }
 
-private final class XMLKeyCheck: NSObject, XMLParserDelegate {
+private final class XMLStructure: NSObject, XMLParserDelegate {
+    private struct Container {
+        let path: [PlistPathComponent]
+        var keys: Set<String>?
+        var count = 0
+    }
+
     private let parser: XMLParser
-    private var dictionaryKeys: [Set<String>?] = []
-    private var key: String?
+    private let firstLine: Int
+    private var containers: [Container] = []
+    private var key: (name: String, line: Int)?
+    private var valueKey: String?
+    private var found: [[PlistPathComponent]: Int] = [:]
     private var failure: PlistReadError?
 
-    init(_ data: Data) {
+    init(_ data: Data, firstLine: Int) {
         parser = XMLParser(data: data)
+        self.firstLine = firstLine
         super.init()
         parser.delegate = self
     }
 
-    func run() throws(PlistReadError) {
+    func lines() throws(PlistReadError) -> [[PlistPathComponent]: Int] {
         parser.parse()
         if let failure {
             throw failure
         }
+        return found
     }
 
     func parser(
@@ -85,21 +108,22 @@ private final class XMLKeyCheck: NSObject, XMLParserDelegate {
         attributes attributeDict: [String: String] = [:]
     ) {
         switch elementName {
-        case "dict":
-            dictionaryKeys.append([])
-        case "array":
-            dictionaryKeys.append(nil)
-        case "key":
-            key = ""
-        default:
+        case "plist":
             break
+        case "key":
+            key = ("", line)
+        default:
+            let path = valuePath()
+            if elementName == "dict" || elementName == "array" {
+                containers.append(Container(path: path, keys: elementName == "dict" ? [] : nil))
+            }
         }
     }
 
     func parser(_ parser: XMLParser, didEndElement elementName: String, namespaceURI: String?, qualifiedName qName: String?) {
         switch elementName {
         case "dict", "array":
-            _ = dictionaryKeys.popLast()
+            _ = containers.popLast()
         case "key":
             closeKey()
         default:
@@ -108,22 +132,42 @@ private final class XMLKeyCheck: NSObject, XMLParserDelegate {
     }
 
     func parser(_ parser: XMLParser, foundCharacters string: String) {
-        key? += string
+        key?.name += string
     }
 
     func parser(_ parser: XMLParser, foundCDATA CDATABlock: Data) {
-        key? += String(bytes: CDATABlock, encoding: .utf8) ?? ""
+        key?.name += String(bytes: CDATABlock, encoding: .utf8) ?? ""
+    }
+
+    private var line: Int {
+        firstLine + parser.lineNumber - 1
+    }
+
+    private func valuePath() -> [PlistPathComponent] {
+        guard let top = containers.indices.last else {
+            return []
+        }
+        if containers[top].keys == nil {
+            let path = containers[top].path + [.index(containers[top].count)]
+            containers[top].count += 1
+            found[path] = line
+            return path
+        }
+        defer { valueKey = nil }
+        return containers[top].path + [.key(valueKey ?? "")]
     }
 
     private func closeKey() {
-        let name = key ?? ""
+        let (name, keyLine) = key ?? ("", line)
         key = nil
-        guard let top = dictionaryKeys.indices.last, dictionaryKeys[top] != nil else {
-            return fail(.invalid("unexpected key at line \(parser.lineNumber)"))
+        guard let top = containers.indices.last, containers[top].keys != nil else {
+            return fail(.invalid("unexpected key at line \(keyLine)"))
         }
-        if dictionaryKeys[top]?.insert(name).inserted == false {
-            fail(.duplicateKey(name))
+        if containers[top].keys?.insert(name).inserted == false {
+            return fail(.duplicateKey(name, line: keyLine))
         }
+        found[containers[top].path + [.key(name)]] = keyLine
+        valueKey = name
     }
 
     private func fail(_ error: PlistReadError) {
@@ -138,16 +182,16 @@ extension PlistValue {
         .array(strings.map(PlistValue.string))
     }
 
-    var pythonRepr: String {
+    var literal: String {
         switch self {
         case .dictionary(let entries):
-            "{" + entries.sorted { $0.key.pythonPrecedes($1.key) }.map { "\($0.key.pythonRepr): \($0.value.pythonRepr)" }.joined(separator: ", ") + "}"
+            "{" + entries.sorted { $0.key.pythonPrecedes($1.key) }.map { "\($0.key.quoted): \($0.value.literal)" }.joined(separator: ", ") + "}"
         case .array(let items):
-            "[" + items.map(\.pythonRepr).joined(separator: ", ") + "]"
+            "[" + items.map(\.literal).joined(separator: ", ") + "]"
         case .string(let text):
-            text.pythonRepr
+            text.quoted
         case .bool(let flag):
-            flag ? "True" : "False"
+            String(flag)
         case .integer(let number):
             String(number)
         case .real(let number):
@@ -155,11 +199,6 @@ extension PlistValue {
         case .date(let text), .data(let text):
             text
         }
-    }
-
-    var pythonStr: String {
-        guard case .string(let text) = self else { return pythonRepr }
-        return text
     }
 
     var plistTypeName: String {
@@ -177,49 +216,47 @@ extension PlistValue {
 }
 
 extension String {
+    var quoted: String {
+        "\"" + unicodeScalars.map(\.quoted).joined() + "\""
+    }
+
+    var isPlain: Bool {
+        unicodeScalars.allSatisfy { $0.isVisible && !$0.properties.isWhitespace }
+    }
+
     func pythonPrecedes(_ other: String) -> Bool {
         unicodeScalars.lexicographicallyPrecedes(other.unicodeScalars)
     }
+}
 
-    var pythonRepr: String {
-        let quote: Unicode.Scalar = unicodeScalars.contains("'") && !unicodeScalars.contains("\"") ? "\"" : "'"
-        let body = unicodeScalars.map { Self.escaped($0, quote: quote) }.joined()
-        return "\(quote)\(body)\(quote)"
-    }
-
-    private static func escaped(_ scalar: Unicode.Scalar, quote: Unicode.Scalar) -> String {
-        switch scalar {
-        case "\\", quote:
-            "\\\(scalar)"
-        case "\t":
-            "\\t"
+private extension Unicode.Scalar {
+    var quoted: String {
+        switch self {
+        case "\"", "\\":
+            "\\\(self)"
         case "\n":
             "\\n"
+        case "\t":
+            "\\t"
         case "\r":
             "\\r"
-        case _ where isPrintable(scalar):
-            String(scalar)
+        case _ where isVisible:
+            String(self)
         default:
-            hexEscaped(scalar.value)
+            "\\u{\(String(value, radix: 16, uppercase: true))}"
         }
     }
 
-    private static func isPrintable(_ scalar: Unicode.Scalar) -> Bool {
-        if scalar.isASCII {
-            return scalar.value >= 0x20 && scalar.value != 0x7F
+    var isVisible: Bool {
+        if isASCII {
+            return value >= 0x20 && value != 0x7F
         }
-        switch scalar.properties.generalCategory {
+        switch properties.generalCategory {
         case .control, .format, .surrogate, .privateUse, .unassigned, .lineSeparator, .paragraphSeparator, .spaceSeparator:
             return false
         default:
             return true
         }
-    }
-
-    private static func hexEscaped(_ value: UInt32) -> String {
-        let (prefix, width) = value <= 0xFF ? ("\\x", 2) : value <= 0xFFFF ? ("\\u", 4) : ("\\U", 8)
-        let digits = String(value, radix: 16)
-        return prefix + String(repeating: "0", count: width - digits.count) + digits
     }
 }
 

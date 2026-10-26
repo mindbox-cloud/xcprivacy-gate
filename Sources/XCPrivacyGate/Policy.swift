@@ -34,14 +34,7 @@ package struct Policy: Sendable {
         for target in targets {
             let use = ModuleUse(source: source[target.name, default: .empty], binary: binary[target.name, default: .empty])
             guard target.manifest != nil else {
-                if !use.merged.findings.isEmpty {
-                    violations.append(Violation(
-                        code: "TARGET_WITHOUT_MANIFEST_USES_API",
-                        module: target.name,
-                        message: "\(target.name): the target has no \(ManifestValidator.fileName) but uses required-reason APIs: "
-                            + "\(calls(use.merged.findings)). Add a manifest and list it in the target's resources in Package.swift"
-                    ))
-                }
+                violations += withoutManifest(target.name, findings: use.merged.findings)
                 continue
             }
             if let manifest = manifests[target.name] {
@@ -52,6 +45,21 @@ package struct Policy: Sendable {
         return violations.sorted {
             ($0.module ?? "", $0.code, $0.file ?? "", $0.line ?? 0, $0.message) < ($1.module ?? "", $1.code, $1.file ?? "", $1.line ?? 0, $1.message)
         }
+    }
+
+    private func withoutManifest(_ name: String, findings: [Finding]) -> [Violation] {
+        guard !findings.isEmpty else { return [] }
+        let grouped = byCategory(findings)
+        let categories = grouped.keys.pythonSorted().map { "\($0) (\(calls(grouped[$0, default: []])))" }.joined(separator: ", ")
+        let first = findings.compactMap { finding in finding.file.map { (file: $0, line: finding.line ?? 0) } }.min { ($0.file, $0.line) < ($1.file, $1.line) }
+        return [Violation(
+            code: "TARGET_WITHOUT_MANIFEST_USES_API",
+            module: name,
+            message: "\(name): the build ships no \(ManifestValidator.fileName) for the target, but it uses \(categories). Put a manifest that declares "
+                + "these categories in the target's directory and list it in resources: in Package.swift (swift-tools-version 5.3 or later)",
+            file: first?.file,
+            line: first?.line
+        )]
     }
 
     fileprivate func category(of entry: UsageEntry) -> String? {
@@ -142,8 +150,8 @@ private struct ModuleCheck {
         self.manifest = manifest
         self.policy = policy
         self.overrides = overrides
-        used = Self.byCategory(use.merged.findings)
-        sourceUsed = Self.byCategory(use.source)
+        used = byCategory(use.merged.findings)
+        sourceUsed = byCategory(use.source)
         entries = policy.usage.entries.filter { $0.module == name }.compactMap { entry in policy.category(of: entry).map { (entry: entry, category: $0) } }
         standardOrPrivate = use.merged.usesStandardDefaults || !use.merged.privateSuites.isDisjoint(with: policy.usage.privateSuites)
     }
@@ -163,28 +171,21 @@ private struct ModuleCheck {
             if used[category] == nil && !overridden.contains(category) {
                 violations.append(violation(
                     "EXTRA_CATEGORY",
-                    "\(name): the manifest declares \(category), but no code in the module uses it. Remove the entry, or add an override with evidence to usage.json if Apple requires it"
+                    "\(name): the manifest declares \(category), but no code in the module uses it. Remove the entry, and the \(ManifestKey.apiTypes) key "
+                        + "with its last entry (TN3181), or add an override with evidence to usage.json if Apple requires it",
+                    category: category
                 ))
             } else if isPolicyGoverned(category) {
                 violations += userDefaultsViolations(declared: Set(declaredReasons))
             } else if !unresolved.contains(category) && Set(declaredReasons) != reasons[category, default: []] {
                 violations.append(violation(
                     "REASONS_MISMATCH",
-                    "\(name): the manifest declares \(category) reasons \(codes(declaredReasons)), but usage.json explains \(codes(reasons[category, default: []])). Make them equal"
+                    "\(name): the manifest declares \(category) reasons \(codes(declaredReasons)), but usage.json explains \(codes(reasons[category, default: []])). Make them equal",
+                    category: category
                 ))
             }
         }
         return violations
-    }
-
-    private static func byCategory(_ findings: [Finding]) -> [String: [Finding]] {
-        var result: [String: [Finding]] = [:]
-        for finding in findings {
-            for category in finding.categories {
-                result[category, default: []].append(finding)
-            }
-        }
-        return result
     }
 
     private func isPolicyGoverned(_ category: String) -> Bool {
@@ -225,15 +226,16 @@ private struct ModuleCheck {
             let new = Set(unregistered.map { $0.location ?? $0.evidence }).pythonSorted().joined(separator: ", ")
             return [violation(
                 "LIKELY_MOVE",
-                "\(name): usage.json registers \(api) (\(category)) in \(old), but the call is now at \(new). Update the file in usage.json",
+                "\(name): usage.json registers \(api) (\(category)) in \(old), but the use is now at \(new). Update the file in usage.json",
                 at: moved
             )]
         }
         let calls = unregistered.map { finding in
             violation(
                 "UNREGISTERED_CALL",
-                "\(name): \(finding.location ?? finding.evidence) calls \(api) (\(category)), and usage.json has no entry for it in this file. "
-                    + "Add an entry with module, file, api, purpose and one of Apple's reasons: \(reasonTexts(category))",
+                "\(name): \(finding.location ?? finding.evidence) uses \(api) (\(category)), and usage.json has no entry for it in this file. "
+                    + "Add an entry with module, file, api, purpose and one of Apple's reasons for the category: "
+                    + "\(codes(policy.rules.categories[category, default: [:]].keys))\(declaredReasons(category)). See \(ApplePage.requiredReasons.link)",
                 at: finding
             )
         }
@@ -241,7 +243,7 @@ private struct ModuleCheck {
             Violation(
                 code: "STALE_ENTRY",
                 module: name,
-                message: "\(name): usage.json registers \(api) (\(entry.reason)) in \(entry.file), but no such call exists there. Remove the entry",
+                message: "\(name): usage.json registers \(api) (\(entry.reason)) in \(entry.file), but that file no longer uses it. Remove the entry",
                 file: entry.file
             )
         }
@@ -261,7 +263,7 @@ private struct ModuleCheck {
             let evidence = Set(findings.map(\.evidence)).pythonSorted().joined(separator: "; ")
             violations.append(violation(
                 "BINARY_ONLY_API",
-                "\(name): the compiled module uses \(api) (\(evidence)), but no source file in the module calls it. Add a usage.json entry "
+                "\(name): the compiled module uses \(api) (\(evidence)), but no source file in the module uses it. Add a usage.json entry "
                     + "with the file that reaches it, or an override with evidence for \(categories.pythonSorted().joined(separator: ", "))"
             ))
         }
@@ -271,7 +273,7 @@ private struct ModuleCheck {
     private func missing(_ category: String) -> Violation {
         let needed = isPolicyGoverned(category) ? userDefaultsRequired : reasons[category, default: []]
         let advice = needed.isEmpty
-            ? "Register its calls in usage.json, then declare it with the registered reasons"
+            ? "Register its uses in usage.json, then declare it with the registered reasons"
             : "Declare it with reasons \(codes(needed))"
         return violation(
             "MISSING_CATEGORY",
@@ -292,19 +294,22 @@ private struct ModuleCheck {
             violations.append(violation(
                 "UD_APP_GROUP_REQUIRED",
                 "\(name): the module uses UserDefaults, and the userDefaultsAppGroup policy requires \(appGroup) because the SDK keeps its data "
-                    + "in an App Group suite. Add \(appGroup) to \(category)"
+                    + "in an App Group suite. Add \(appGroup) to \(category)",
+                category: category
             ))
         }
         if standardOrPrivate && !declared.contains(standard) {
             violations.append(violation(
                 "UD_STANDARD_REQUIRED",
-                "\(name): the module uses UserDefaults.standard or a private suite listed in usage.json. Add \(standard) to \(category)"
+                "\(name): the module uses UserDefaults.standard or a private suite listed in usage.json. Add \(standard) to \(category)",
+                category: category
             ))
         }
         if !standardOrPrivate && declared.contains(standard) {
             violations.append(violation(
                 "UD_CA92_UNUSED",
-                "\(name): the manifest declares \(standard), but the module uses neither UserDefaults.standard nor a private suite listed in usage.json. Remove \(standard)"
+                "\(name): the manifest declares \(standard), but the module uses neither UserDefaults.standard nor a private suite listed in usage.json. Remove \(standard)",
+                category: category
             ))
         }
         let others = declared.subtracting([appGroup, standard])
@@ -312,21 +317,22 @@ private struct ModuleCheck {
             violations.append(violation(
                 "REASONS_MISMATCH",
                 "\(name): the manifest declares \(category) reasons \(codes(others)); the userDefaultsAppGroup policy allows only \(appGroup) "
-                    + "(App Group suite) and \(standard) (standard or private suite)"
+                    + "(App Group suite) and \(standard) (standard or private suite)",
+                category: category
             ))
         }
         return violations
     }
 
-    private func reasonTexts(_ category: String) -> String {
-        (policy.rules.categories[category] ?? [:]).sorted { $0.key.pythonPrecedes($1.key) }.map { "\($0.key): \($0.value)" }.joined(separator: "; ")
+    private func declaredReasons(_ category: String) -> String {
+        manifest.apiTypes[category].map { "; the manifest declares \(codes($0))" } ?? ""
     }
 
-    private func violation(_ code: String, _ message: String, at finding: Finding? = nil) -> Violation {
+    private func violation(_ code: String, _ message: String, at finding: Finding? = nil, category: String? = nil) -> Violation {
         if let finding, let file = finding.file {
             return Violation(code: code, module: name, message: message, file: file, line: finding.line)
         }
-        return Violation(code: code, module: name, message: message, file: manifest.path.path)
+        return Violation(code: code, module: name, message: message, file: manifest.path.path, line: category.flatMap { manifest.categoryLines[$0] })
     }
 }
 
@@ -339,6 +345,16 @@ private extension Finding {
     var summary: String {
         location.map { "\(api) at \($0)" } ?? "\(api): \(evidence)"
     }
+}
+
+private func byCategory(_ findings: [Finding]) -> [String: [Finding]] {
+    var result: [String: [Finding]] = [:]
+    for finding in findings {
+        for category in finding.categories {
+            result[category, default: []].append(finding)
+        }
+    }
+    return result
 }
 
 private func calls(_ findings: [Finding]) -> String {

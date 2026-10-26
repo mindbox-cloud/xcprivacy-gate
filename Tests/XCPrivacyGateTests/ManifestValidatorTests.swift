@@ -59,28 +59,29 @@ struct ManifestValidatorTests {
     func duplicateKeyIsRejected() throws {
         let message = try message(of: "MANIFEST_DUPLICATE_KEY", in: manifestXML(extra: "<key>NSPrivacyTracking</key><true/>"))
 
-        #expect(message.contains("'NSPrivacyTracking'"))
+        #expect(message.contains("\"NSPrivacyTracking\""))
     }
 
     @Test("Xcode's template placeholder is rejected")
     func xcodeTemplatePlaceholderIsRejected() throws {
         let message = try message(of: "MANIFEST_API_ENTRY_KEYS", in: manifestXML(apiTypes: "<array><dict/></array>"))
 
-        #expect(message.contains("[]"))
+        #expect(message == "Core: API entry 1 must have exactly the keys NSPrivacyAccessedAPIType, NSPrivacyAccessedAPITypeReasons, but it has no keys. "
+            + "Fill it in, or remove the entry if the SDK does not use that API (TN3181)")
     }
 
     @Test("a reason with a trailing space is rejected")
     func reasonWithTrailingSpaceIsRejected() throws {
         let message = try message(of: "MANIFEST_UNKNOWN_REASON", in: manifestXML(apiTypes: "<array>\(apiEntry(reasons: ["CA92.1 "]))</array>"))
 
-        #expect(message.contains("'CA92.1 '"))
+        #expect(message.contains("\"CA92.1 \""))
     }
 
     @Test("a shorthand category is rejected")
     func shorthandCategoryIsRejected() throws {
         let message = try message(of: "MANIFEST_UNKNOWN_CATEGORY", in: manifestXML(apiTypes: "<array>\(apiEntry(category: "UserDefaults"))</array>"))
 
-        #expect(message.contains("'UserDefaults'"))
+        #expect(message.contains("\"UserDefaults\""))
     }
 
     @Test("a reason from another category is rejected")
@@ -129,7 +130,7 @@ struct ManifestValidatorTests {
     func missingTrackingIsRejectedWhileTrackingDisabledIsOn() throws {
         let message = try message(of: "MANIFEST_MISSING_KEY", in: manifestXML(tracking: nil))
 
-        #expect(message.contains("missing key 'NSPrivacyTracking'; the SDK must declare false"))
+        #expect(message.contains("missing key NSPrivacyTracking; the SDK must declare false"))
     }
 
     @Test("a missing tracking key is allowed when trackingDisabled is off")
@@ -144,7 +145,7 @@ struct ManifestValidatorTests {
     func domainsWithTrackingFalseAreRejected() throws {
         let message = try message(of: "TRACKING_DOMAINS", in: manifestXML(domains: "<array><string>api.example.com</string></array>"))
 
-        #expect(message.contains("'api.example.com'"))
+        #expect(message.contains("\"api.example.com\""))
     }
 
     @Test("a collected data entry needs all four keys and Boolean flags")
@@ -165,7 +166,7 @@ struct ManifestValidatorTests {
 
         let message = try message(of: "MANIFEST_UNKNOWN_DATA_TYPE", in: manifestXML(collected: "<array>\(entry)</array>"))
 
-        #expect(message.contains("'NSPrivacyCollectedDataTypeDeviceId'"))
+        #expect(message.contains("\"NSPrivacyCollectedDataTypeDeviceId\""))
     }
 
     @Test("an unknown purpose is rejected")
@@ -174,14 +175,14 @@ struct ManifestValidatorTests {
 
         let message = try message(of: "MANIFEST_UNKNOWN_PURPOSE", in: manifestXML(collected: "<array>\(entry)</array>"))
 
-        #expect(message.contains("'App Functionality'"))
+        #expect(message.contains("\"App Functionality\""))
     }
 
     @Test("an unknown top-level key is rejected")
     func unknownTopLevelKeyIsRejected() throws {
         let message = try message(of: "MANIFEST_UNKNOWN_KEY", in: manifestXML(extra: "<key>NSPrivacyTrackingDomain</key><array/>"))
 
-        #expect(message.contains("'NSPrivacyTrackingDomain'"))
+        #expect(message.contains("\"NSPrivacyTrackingDomain\""))
     }
 
     @Test("a category listed twice is rejected")
@@ -198,7 +199,7 @@ struct ManifestValidatorTests {
         let (manifest, violations) = try check(xml, fileName: "privacyinfo.xcprivacy")
 
         #expect(violations.map(\.code) == ["MANIFEST_FILE_NAME", "TRACKING_ENABLED"])
-        #expect(violations.first?.message.contains("'privacyinfo.xcprivacy'") == true)
+        #expect(violations.first?.message.contains("\"privacyinfo.xcprivacy\"") == true)
         #expect(manifest != nil)
     }
 
@@ -229,11 +230,11 @@ struct ManifestValidatorTests {
     }
 
     @Test("a tracking domain must be a bare host name while tracking is allowed", arguments: [
-        ("https://api.example.com", "'https://api.example.com'"),
-        ("example", "'example'"),
-        ("api.example.com/sdk", "'api.example.com/sdk'"),
-        ("api..example.com", "'api..example.com'"),
-        ("api.example.com\n", "'api.example.com\\n'")
+        ("https://api.example.com", "\"https://api.example.com\""),
+        ("example", "\"example\""),
+        ("api.example.com/sdk", "\"api.example.com/sdk\""),
+        ("api..example.com", "\"api..example.com\""),
+        ("api.example.com\n", "\"api.example.com\\n\"")
     ])
     func trackingDomainMustBeBareHostName(domain: String, shown: String) throws {
         let xml = manifestXML(tracking: "<true/>", domains: "<array><string>\(domain)</string></array>")
@@ -308,7 +309,7 @@ struct ManifestValidatorTests {
     func duplicateKeyAfterLeadingBlankLineIsRejected() throws {
         let message = try message(of: "MANIFEST_DUPLICATE_KEY", in: "\n" + manifestXML(extra: "<key>NSPrivacyTracking</key><true/>"))
 
-        #expect(message.contains("'NSPrivacyTracking'"))
+        #expect(message.contains("\"NSPrivacyTracking\""))
     }
 
     @Test("an XML entity declaration makes the manifest unreadable", arguments: [

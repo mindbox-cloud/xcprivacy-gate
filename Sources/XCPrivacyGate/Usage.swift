@@ -52,7 +52,7 @@ package struct Usage: Sendable {
     private init(_ raw: RawUsage, rules: Rules, userDefaultsAppGroup: Bool) throws {
         for call in raw.calls {
             guard let api = rules.apis[call.entry.api] else {
-                throw ToolError(message: "\(call.label): unknown API \(call.entry.api.pythonRepr)")
+                throw ToolError(message: "\(call.label): unknown API \(call.entry.api.quoted)")
             }
             if userDefaultsAppGroup, api.categories.contains(UserDefaultsPolicy.category) {
                 throw ToolError(message: "\(call.label): UserDefaults follows the userDefaultsAppGroup policy, not call entries")
@@ -158,7 +158,7 @@ private struct RawOverride: Decodable {
 
     private static func day(_ text: String) throws -> Date {
         guard let date = try? Date(text, strategy: Override.dayFormat), date.formatted(Override.dayFormat) == text else {
-            throw ToolError(message: "expires must be a calendar date written as YYYY-MM-DD, found \(text.pythonRepr)")
+            throw ToolError(message: "expires must be a calendar date written as YYYY-MM-DD, found \(text.quoted)")
         }
         return date
     }

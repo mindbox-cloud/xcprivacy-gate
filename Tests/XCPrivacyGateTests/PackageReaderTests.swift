@@ -117,7 +117,7 @@ struct PackageReaderTests {
             let violations = try readPackage(package).violations
 
             #expect(codes(violations) == ["PACKAGE_DEPENDENCY"])
-            #expect(violations.first?.message.contains("'swift-collections'") == true)
+            #expect(violations.first?.message.contains("\"swift-collections\"") == true)
         }
     }
 

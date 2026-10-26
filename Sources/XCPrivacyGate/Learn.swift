@@ -113,7 +113,7 @@ package enum Learn {
         }
         return try rule.fixtures.map { fixture in
             guard SelfTest.isSwiftFixture(fixture, in: directory) else {
-                throw ToolError(message: "\(rule.api): fixture \(fixture.pythonRepr) is not a Swift file in \(directory.path)")
+                throw ToolError(message: "\(rule.api): fixture \(fixture.quoted) is not a Swift file in \(directory.path)")
             }
             return directory.appending(path: fixture)
         }
@@ -121,10 +121,10 @@ package enum Learn {
 
     private static func requireNames(_ rule: ApiRule) throws {
         guard !rule.usrs.isEmpty else {
-            throw ToolError(message: "\(rule.api): no learned USR names \(rule.api.pythonRepr); check its fixtures")
+            throw ToolError(message: "\(rule.api): no learned USR names \(rule.api.quoted); check its fixtures")
         }
         guard !(rule.symbols.isEmpty && rule.selectors.isEmpty && rule.swiftSymbols.isEmpty) else {
-            throw ToolError(message: "\(rule.api): no learned binary name contains \(rule.api.pythonRepr); check its fixtures")
+            throw ToolError(message: "\(rule.api): no learned binary name contains \(rule.api.quoted); check its fixtures")
         }
     }
 }

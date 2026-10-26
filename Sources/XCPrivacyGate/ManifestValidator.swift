@@ -3,10 +3,12 @@ import Foundation
 package struct Manifest: Sendable {
     package let path: URL
     package let apiTypes: [String: [String]]
+    package let categoryLines: [String: Int]
 
-    package init(path: URL, apiTypes: [String: [String]]) {
+    package init(path: URL, apiTypes: [String: [String]], categoryLines: [String: Int]) {
         self.path = path
         self.apiTypes = apiTypes
+        self.categoryLines = categoryLines
     }
 }
 
@@ -24,7 +26,7 @@ package enum ManifestValidator {
     }
 }
 
-private enum Key {
+enum ManifestKey {
     static let tracking = "NSPrivacyTracking"
     static let domains = "NSPrivacyTrackingDomains"
     static let collected = "NSPrivacyCollectedDataTypes"
@@ -40,29 +42,46 @@ private enum Key {
     static let dataEntry: Set = [dataType, dataLinked, dataTracking, dataPurposes]
 }
 
+private typealias Key = ManifestKey
+private typealias PlistPath = [PlistPathComponent]
+
+private struct EntryShape {
+    static let api = EntryShape(keys: Key.apiEntry, code: "MANIFEST_API_ENTRY_KEYS", removal: "remove the entry if the SDK does not use that API (TN3181)")
+    static let data = EntryShape(keys: Key.dataEntry, code: "MANIFEST_DATA_ENTRY_KEYS", removal: "remove the entry if the SDK does not collect that data")
+
+    let keys: Set<String>
+    let code: String
+    let removal: String
+}
+
 private struct ManifestCheck {
     let url: URL
     let module: String
     let rules: Rules
     let trackingDisabled: Bool
+    var lines: [PlistPath: Int] = [:]
     var violations: [Violation] = []
 
     mutating func run() -> Manifest? {
         if url.lastPathComponent != ManifestValidator.fileName {
-            report("MANIFEST_FILE_NAME", "file is named \(url.lastPathComponent.pythonRepr), Apple requires \(ManifestValidator.fileName.pythonRepr)")
+            report("MANIFEST_FILE_NAME", "file is named \(url.lastPathComponent.quoted), Apple requires \(ManifestValidator.fileName.quoted)")
         }
         guard let content = read() else { return nil }
         checkDomains(content, tracking: tracking(content))
         checkCollected(content)
         let apiTypes = apiTypes(content)
         for key in content.keys.filter({ !Key.topLevel.contains($0) }).pythonSorted() {
-            report("MANIFEST_UNKNOWN_KEY", "unknown top-level key \(key.pythonRepr)")
+            report("MANIFEST_UNKNOWN_KEY", "unknown top-level key \(key.quoted)", at: [.key(key)])
         }
-        return Manifest(path: url, apiTypes: apiTypes)
+        return Manifest(path: url, apiTypes: apiTypes.reasons, categoryLines: apiTypes.lines)
     }
 
-    private mutating func report(_ code: String, _ message: String) {
-        violations.append(Violation(code: code, module: module, message: "\(url.path): \(message)", file: url.path))
+    private mutating func report(_ code: String, _ message: String, at path: PlistPath = []) {
+        report(code, message, line: lines[path])
+    }
+
+    private mutating func report(_ code: String, _ message: String, line: Int?) {
+        violations.append(Violation(code: code, module: module, message: "\(module): \(message)", file: url.path, line: line))
     }
 
     private mutating func read() -> [String: PlistValue]? {
@@ -73,173 +92,203 @@ private struct ManifestCheck {
             report("MANIFEST_UNREADABLE", "cannot read the file: \(error.localizedDescription)")
             return nil
         }
-        let root: PlistValue
+        let document: PlistDocument
         do throws(PlistReadError) {
-            root = try PlistReader.read(data)
+            document = try PlistReader.read(data)
         } catch {
             switch error {
-            case .duplicateKey(let key):
-                report("MANIFEST_DUPLICATE_KEY", "key \(key.pythonRepr) appears more than once")
+            case .duplicateKey(let key, let line):
+                report("MANIFEST_DUPLICATE_KEY", "key \(key.quoted) appears more than once", line: line)
             case .invalid(let message):
                 report("MANIFEST_UNREADABLE", "not a valid property list: \(message)")
             }
             return nil
         }
-        guard case .dictionary(let content) = root else {
-            report("MANIFEST_UNREADABLE", "top level is of type \(root.plistTypeName), expected dictionary")
+        guard case .dictionary(let content) = document.root else {
+            report("MANIFEST_UNREADABLE", "top level is of type \(document.root.plistTypeName), expected dictionary")
             return nil
         }
+        lines = document.lines
         return content
     }
 
     private mutating func tracking(_ content: [String: PlistValue]) -> Bool {
+        let path: PlistPath = [.key(Key.tracking)]
         guard let value = content[Key.tracking] else {
             if trackingDisabled {
-                report("MANIFEST_MISSING_KEY", "missing key \(Key.tracking.pythonRepr); the SDK must declare false")
+                report("MANIFEST_MISSING_KEY", "missing key \(Key.tracking); the SDK must declare false")
             }
             return false
         }
         guard case .bool(let tracking) = value else {
-            report("MANIFEST_TYPE", "\(Key.tracking) must be a Boolean, found \(value.pythonRepr)")
+            report("MANIFEST_TYPE", "\(Key.tracking) must be a Boolean, found \(value.literal)", at: path)
             return false
         }
         if tracking && trackingDisabled {
-            report("TRACKING_ENABLED", "\(Key.tracking) is \(value.pythonRepr); the SDK must declare false")
+            report("TRACKING_ENABLED", "\(Key.tracking) is true; the SDK must declare false", at: path)
         }
         return tracking
     }
 
     private mutating func checkDomains(_ content: [String: PlistValue], tracking: Bool) {
+        let path: PlistPath = [.key(content[Key.domains] == nil ? Key.tracking : Key.domains)]
         let value = content[Key.domains] ?? .array([])
-        guard let domains = value.nonEmptyStrings else {
-            report("MANIFEST_TYPE", "\(Key.domains) must be an array of non-empty strings, found \(value.pythonRepr)")
-            return
-        }
+        guard let domains = strings(value, key: Key.domains, label: nil, at: path) else { return }
         if tracking && domains.isEmpty {
-            report("TRACKING_DOMAINS", "\(Key.domains) lists no domain while \(Key.tracking) is true (TN3181)")
+            report("TRACKING_DOMAINS", "\(Key.domains) lists no domain while \(Key.tracking) is true (TN3181)", at: path)
         }
-        for domain in domains {
+        for (index, domain) in domains.enumerated() {
             if !tracking {
-                report("TRACKING_DOMAINS", "\(Key.domains) lists \(domain.pythonRepr) while \(Key.tracking) is false (ITMS-91064)")
+                report("TRACKING_DOMAINS", "\(Key.domains) lists \(domain.quoted) while \(Key.tracking) is false (ITMS-91064)", at: path + [.index(index)])
             } else if domain.wholeMatch(of: /[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)+/) == nil {
-                report("TRACKING_DOMAINS", "tracking domain \(domain.pythonRepr) must be a bare host name")
+                report("TRACKING_DOMAINS", "tracking domain \(domain.quoted) must be a bare host name", at: path + [.index(index)])
             }
         }
     }
 
     private mutating func checkCollected(_ content: [String: PlistValue]) {
         guard let value = content[Key.collected] else { return }
+        let path: PlistPath = [.key(Key.collected)]
         guard case .array(let items) = value else {
-            report("MANIFEST_TYPE", "\(Key.collected) must be an array, found \(value.pythonRepr)")
+            report("MANIFEST_TYPE", "\(Key.collected) must be an array, found \(value.literal)", at: path)
             return
         }
         var seen: Set<String> = []
-        for item in items {
-            guard let entry = fields(of: item, keys: Key.dataEntry, code: "MANIFEST_DATA_ENTRY_KEYS", entry: "collected data entry"),
+        for (index, item) in items.enumerated() {
+            let entryPath = path + [.index(index)]
+            let label = item.name(at: Key.dataType) ?? "collected data entry \(index + 1)"
+            guard let entry = fields(of: item, shape: .data, label: label, at: entryPath),
                   let type = entry[Key.dataType], let linked = entry[Key.dataLinked], let tracking = entry[Key.dataTracking],
                   let purposes = entry[Key.dataPurposes] else { continue }
-            checkDataEntry(type: type, linked: linked, tracking: tracking, purposes: purposes, seen: &seen)
+            checkDataType(type, label: label, seen: &seen, at: entryPath + [.key(Key.dataType)])
+            for (key, value) in [(Key.dataLinked, linked), (Key.dataTracking, tracking)] where !value.isBool {
+                report("MANIFEST_TYPE", "\(label): \(key) must be a Boolean, found \(value.literal)", at: entryPath + [.key(key)])
+            }
+            if case .bool(true) = tracking, trackingDisabled {
+                report("TRACKING_ENABLED", "\(label): \(Key.dataTracking) is true; the SDK must declare false", at: entryPath + [.key(Key.dataTracking)])
+            }
+            checkPurposes(purposes, label: label, at: entryPath + [.key(Key.dataPurposes)])
         }
     }
 
-    private mutating func fields(of item: PlistValue, keys: Set<String>, code: String, entry: String) -> [String: PlistValue]? {
-        if case .dictionary(let fields) = item, Set(fields.keys) == keys {
+    private mutating func fields(of item: PlistValue, shape: EntryShape, label: String, at path: PlistPath) -> [String: PlistValue]? {
+        let expected = shape.keys.pythonSorted().joined(separator: ", ")
+        guard case .dictionary(let fields) = item else {
+            report(shape.code, "\(label) must be a dictionary with the keys \(expected), found \(item.literal)", at: path)
+            return nil
+        }
+        guard Set(fields.keys) != shape.keys else {
             return fields
         }
-        let found = if case .dictionary(let fields) = item { PlistValue.list(fields.keys.pythonSorted()) } else { item }
-        report(code, "\(entry) must have exactly \(PlistValue.list(keys.pythonSorted()).pythonRepr), found \(found.pythonRepr)")
+        let missing = shape.keys.subtracting(fields.keys).pythonSorted().joined(separator: ", ")
+        let extra = Set(fields.keys).subtracting(shape.keys).pythonSorted().joined(separator: ", ")
+        let problem = switch (fields.isEmpty, missing.isEmpty, extra.isEmpty) {
+        case (true, _, _): "has no keys. Fill it in, or \(shape.removal)"
+        case (false, false, true): "lacks \(missing). Add \(missing), or \(shape.removal)"
+        case (false, true, false): "also has \(extra). Remove \(extra)"
+        default: "lacks \(missing) and also has \(extra). Add \(missing) and remove \(extra)"
+        }
+        report(shape.code, "\(label) must have exactly the keys \(expected), but it \(problem)", at: path)
         return nil
     }
 
-    private mutating func checkDataEntry(type: PlistValue, linked: PlistValue, tracking: PlistValue, purposes: PlistValue, seen: inout Set<String>) {
-        let label = type.pythonStr
-        checkDataType(type, seen: &seen)
-        for (key, value) in [(Key.dataLinked, linked), (Key.dataTracking, tracking)] where !value.isBool {
-            report("MANIFEST_TYPE", "\(label): \(key) must be a Boolean, found \(value.pythonRepr)")
-        }
-        if case .bool(true) = tracking, trackingDisabled {
-            report("TRACKING_ENABLED", "\(label): \(Key.dataTracking) is True; the SDK must declare false")
-        }
-        checkPurposes(purposes, label: label)
-    }
-
-    private mutating func checkDataType(_ type: PlistValue, seen: inout Set<String>) {
+    private mutating func checkDataType(_ type: PlistValue, label: String, seen: inout Set<String>, at path: PlistPath) {
         guard let name = type.stringValue, isKnownDataType(name) else {
-            report("MANIFEST_UNKNOWN_DATA_TYPE", "unknown collected data type \(type.pythonRepr)")
+            report("MANIFEST_UNKNOWN_DATA_TYPE", "\(label): unknown data type \(type.literal)", at: path)
             return
         }
         if !seen.insert(name).inserted {
-            report("MANIFEST_DUPLICATE_ENTRY", "collected data type \(type.pythonRepr) is listed twice")
+            report("MANIFEST_DUPLICATE_ENTRY", "\(name) is listed in two collected data entries", at: path)
         }
     }
 
-    private mutating func checkPurposes(_ value: PlistValue, label: String) {
-        guard let purposes = value.nonEmptyStrings, !purposes.isEmpty else {
-            report("MANIFEST_TYPE", "\(label): \(Key.dataPurposes) must be a non-empty array of strings, found \(value.pythonRepr)")
+    private mutating func checkPurposes(_ value: PlistValue, label: String, at path: PlistPath) {
+        guard let purposes = strings(value, key: Key.dataPurposes, label: label, at: path) else { return }
+        guard !purposes.isEmpty else {
+            report("MANIFEST_TYPE", "\(label): \(Key.dataPurposes) is empty; list the purposes Apple defines", at: path)
             return
         }
-        for purpose in purposes where !rules.purposes.contains(where: { $0.isLiterally(purpose) }) {
-            report("MANIFEST_UNKNOWN_PURPOSE", "\(label): unknown purpose \(purpose.pythonRepr)")
+        for (index, purpose) in purposes.enumerated() where !rules.purposes.contains(where: { $0.isLiterally(purpose) }) {
+            report("MANIFEST_UNKNOWN_PURPOSE", "\(label): unknown purpose \(purpose.quoted)", at: path + [.index(index)])
         }
-        if Set(purposes).count != purposes.count {
-            report("MANIFEST_DUPLICATE_ENTRY", "\(label): a purpose is listed twice in \(value.pythonRepr)")
+        for purpose in purposes.repeated {
+            report("MANIFEST_DUPLICATE_ENTRY", "\(label): \(Key.dataPurposes) lists \(purpose.quoted) twice", at: path)
         }
     }
 
-    private mutating func apiTypes(_ content: [String: PlistValue]) -> [String: [String]] {
-        guard let value = content[Key.apiTypes] else { return [:] }
+    private mutating func strings(_ value: PlistValue, key: String, label: String?, at path: PlistPath) -> [String]? {
+        let subject = label.map { "\($0): \(key)" } ?? key
+        guard let strings = value.strings else {
+            report("MANIFEST_TYPE", "\(subject) must be an array of strings, found \(value.literal)", at: path)
+            return nil
+        }
+        guard !strings.contains(where: \.isEmpty) else {
+            report("MANIFEST_TYPE", "\(subject) contains an empty string", at: path)
+            return nil
+        }
+        return strings
+    }
+
+    private mutating func apiTypes(_ content: [String: PlistValue]) -> (reasons: [String: [String]], lines: [String: Int]) {
+        guard let value = content[Key.apiTypes] else { return ([:], [:]) }
+        let path: PlistPath = [.key(Key.apiTypes)]
         guard case .array(let items) = value else {
-            report("MANIFEST_TYPE", "\(Key.apiTypes) must be an array, found \(value.pythonRepr)")
-            return [:]
+            report("MANIFEST_TYPE", "\(Key.apiTypes) must be an array, found \(value.literal)", at: path)
+            return ([:], [:])
         }
         guard !items.isEmpty else {
-            report("MANIFEST_EMPTY_API_TYPES", "\(Key.apiTypes) is \(value.pythonRepr); remove the key instead (TN3181)")
-            return [:]
+            report("MANIFEST_EMPTY_API_TYPES", "\(Key.apiTypes) is empty; remove the key instead (TN3181)", at: path)
+            return ([:], [:])
         }
         var result: [String: [String]] = [:]
-        for item in items {
-            guard let entry = fields(of: item, keys: Key.apiEntry, code: "MANIFEST_API_ENTRY_KEYS", entry: "API entry"),
+        var categoryLines: [String: Int] = [:]
+        for (index, item) in items.enumerated() {
+            let entryPath = path + [.index(index)]
+            let label = item.name(at: Key.apiType) ?? "API entry \(index + 1)"
+            guard let entry = fields(of: item, shape: .api, label: label, at: entryPath),
                   let type = entry[Key.apiType], let reasonsValue = entry[Key.apiReasons] else { continue }
-            let reasons = reasons(reasonsValue, category: type)
+            let typePath = entryPath + [.key(Key.apiType)]
+            let reasons = reasons(reasonsValue, category: type, label: label, at: entryPath + [.key(Key.apiReasons)])
             guard let category = type.stringValue, knownReasons(of: category) != nil else {
-                report("MANIFEST_UNKNOWN_CATEGORY", "unknown required-reason category \(type.pythonRepr)")
+                let categories = rules.categories.keys.pythonSorted().joined(separator: ", ")
+                report("MANIFEST_UNKNOWN_CATEGORY", "unknown required-reason category \(type.literal) (ITMS-91054); Apple's categories are \(categories)", at: typePath)
                 continue
             }
             guard result[category] == nil else {
-                report("MANIFEST_DUPLICATE_ENTRY", "category \(type.pythonRepr) is listed twice")
+                report("MANIFEST_DUPLICATE_ENTRY", "\(category) is listed in two API entries", at: typePath)
                 continue
             }
             result[category] = reasons
+            categoryLines[category] = lines[typePath]
         }
-        return result
+        return (result, categoryLines)
     }
 
-    private mutating func reasons(_ value: PlistValue, category: PlistValue) -> [String] {
-        let label = category.pythonRepr
+    private mutating func reasons(_ value: PlistValue, category: PlistValue, label: String, at path: PlistPath) -> [String] {
         guard let reasons = value.strings else {
-            report("MANIFEST_TYPE", "\(label): \(Key.apiReasons) must be an array of strings, found \(value.pythonRepr)")
+            report("MANIFEST_TYPE", "\(label): \(Key.apiReasons) must be an array of strings, found \(value.literal)", at: path)
             return []
         }
         if reasons.isEmpty {
-            report("MANIFEST_EMPTY_REASONS", "\(label): \(Key.apiReasons) is empty")
+            report("MANIFEST_EMPTY_REASONS", "\(label): \(Key.apiReasons) is empty", at: path)
         }
-        if Set(reasons).count != reasons.count {
-            report("MANIFEST_DUPLICATE_ENTRY", "\(label): a reason is listed twice in \(value.pythonRepr)")
+        for reason in reasons.repeated {
+            report("MANIFEST_DUPLICATE_ENTRY", "\(label): \(Key.apiReasons) lists \(reason.quoted) twice", at: path)
         }
         if let name = category.stringValue, let own = knownReasons(of: name) {
-            for reason in reasons where own[reason] == nil {
-                reportForeign(reason, category: label)
+            for (index, reason) in reasons.enumerated() where own[reason] == nil {
+                reportForeign(reason, label: label, at: path + [.index(index)])
             }
         }
         return reasons
     }
 
-    private mutating func reportForeign(_ reason: String, category label: String) {
+    private mutating func reportForeign(_ reason: String, label: String, at path: PlistPath) {
         let owners = rules.categories.filter { $0.value[reason] != nil }.keys.pythonSorted()
         if owners.isEmpty {
-            report("MANIFEST_UNKNOWN_REASON", "\(label): unknown reason \(reason.pythonRepr)")
+            report("MANIFEST_UNKNOWN_REASON", "\(label): unknown reason \(reason.quoted)", at: path)
         } else {
-            report("MANIFEST_REASON_WRONG_CATEGORY", "reason \(reason.pythonRepr) belongs to \(owners.joined(separator: ", ")), not to \(label) (ITMS-91055)")
+            report("MANIFEST_REASON_WRONG_CATEGORY", "\(label): reason \(reason.quoted) belongs to \(owners.joined(separator: ", ")), not to this category (ITMS-91055)", at: path)
         }
     }
 
@@ -264,8 +313,9 @@ private extension PlistValue {
         return strings.count == items.count ? strings : nil
     }
 
-    var nonEmptyStrings: [String]? {
-        strings.flatMap { $0.contains(where: \.isEmpty) ? nil : $0 }
+    func name(at key: String) -> String? {
+        guard case .dictionary(let fields) = self, let name = fields[key]?.stringValue, !name.isEmpty, name.isPlain else { return nil }
+        return name
     }
 
     var isBool: Bool {
@@ -277,5 +327,12 @@ private extension PlistValue {
 private extension String {
     func isLiterally(_ other: String) -> Bool {
         unicodeScalars.elementsEqual(other.unicodeScalars)
+    }
+}
+
+private extension Array where Element == String {
+    var repeated: [String] {
+        var seen: Set<String> = []
+        return Set(filter { !seen.insert($0).inserted }).pythonSorted()
     }
 }
