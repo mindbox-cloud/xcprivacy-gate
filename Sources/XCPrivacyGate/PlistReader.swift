@@ -162,16 +162,16 @@ extension PlistValue {
         return text
     }
 
-    var pythonTypeName: String {
+    var plistTypeName: String {
         switch self {
-        case .dictionary: "dict"
-        case .array: "list"
-        case .string: "str"
-        case .bool: "bool"
-        case .integer: "int"
-        case .real: "float"
-        case .date: "datetime"
-        case .data: "bytes"
+        case .dictionary: "dictionary"
+        case .array: "array"
+        case .string: "string"
+        case .bool: "boolean"
+        case .integer: "integer"
+        case .real: "real"
+        case .date: "date"
+        case .data: "data"
         }
     }
 }

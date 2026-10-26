@@ -86,7 +86,7 @@ private struct ManifestCheck {
             return nil
         }
         guard case .dictionary(let content) = root else {
-            report("MANIFEST_UNREADABLE", "top level is \(root.pythonTypeName), expected a dictionary")
+            report("MANIFEST_UNREADABLE", "top level is of type \(root.plistTypeName), expected dictionary")
             return nil
         }
         return content
