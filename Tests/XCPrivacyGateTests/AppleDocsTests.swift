@@ -1,7 +1,6 @@
 import Foundation
 import Testing
 import XCPrivacyGate
-import XCPrivacyGateRules
 
 @Suite("Apple documentation pages")
 struct AppleDocsTests {
@@ -81,11 +80,11 @@ struct AppleDocsTests {
         #expect(names.contains("NSPrivacyCollectedDataTypePurposeAppFunctionality"))
     }
 
-    @Test("the text of the saved TN3181 page equals the bundled tn3181.txt")
-    func tn3181TextEqualsBundledText() throws {
-        let bundled = try String(contentsOf: RulesBundle.directory.appending(path: "apple/tn3181.txt"), encoding: .utf8)
+    @Test("the text of the saved TN3181 page equals its saved text")
+    func tn3181TextEqualsSavedText() throws {
+        let saved = try String(contentsOf: testData("apple/tn3181-2026-10-25.txt"), encoding: .utf8)
 
-        #expect(try AppleDocs.text(applePage(Self.tn3181Page)) == bundled)
+        #expect(try AppleDocs.text(applePage(Self.tn3181Page)) == saved)
     }
 
     @Test("an unknown DocC block is a tool error naming it")

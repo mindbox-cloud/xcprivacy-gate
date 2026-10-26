@@ -2,7 +2,6 @@ import Foundation
 import os
 import Testing
 import XCPrivacyGate
-import XCPrivacyGateRules
 
 private let systemBootTime = "NSPrivacyAccessedAPICategorySystemBootTime"
 private let activeKeyboards = "NSPrivacyAccessedAPICategoryActiveKeyboards"
@@ -106,8 +105,8 @@ private struct SavedPages {
     func rulesDirectory() throws -> URL {
         let directory = try makeTemporaryDirectory()
         try FileManager.default.createDirectory(at: directory.appending(path: "apple"), withIntermediateDirectories: true)
-        for file in ["rules.json", "apple/tn3181.txt"] {
-            try FileManager.default.copyItem(at: RulesBundle.directory.appending(path: file), to: directory.appending(path: file))
+        for (saved, file) in [("rules-2026-10-25.json", "rules.json"), ("apple/tn3181-2026-10-25.txt", "apple/tn3181.txt")] {
+            try FileManager.default.copyItem(at: testData(saved), to: directory.appending(path: file))
         }
         let names = try SDKList.names(page: #require(bodies[.sdkList]))
         try Data(names.map { "\($0)\n" }.joined().utf8).write(to: directory.appending(path: SDKList.fileName))

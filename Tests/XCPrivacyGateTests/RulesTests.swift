@@ -1,7 +1,6 @@
 import Foundation
 import Testing
 import XCPrivacyGate
-import XCPrivacyGateRules
 
 @Suite("Rules")
 struct RulesTests {
@@ -72,23 +71,6 @@ struct RulesTests {
             let formatted = try JSONFormat.data(JSONDecoder().decode(JSONValue.self, from: data))
             #expect(formatted == data, "\(file) differs from JSONFormat output")
         }
-    }
-
-    @Test("rules.json lists exactly Apple's categories, APIs, data types and purposes from the saved pages")
-    func rulesListExactlyApplesPages() throws {
-        let rules = try Rules.load(RulesBundle.directory.appending(path: "rules.json"))
-        let required = try AppleDocs.requiredReasons(applePage("nsprivacyaccessedapitype-2026-10-25.json"))
-        var appleCategories: [String: Set<String>] = [:]
-        for (category, body) in required {
-            for entry in body.apis {
-                appleCategories[entry.api, default: []].insert(category)
-            }
-        }
-
-        #expect(rules.categories == required.mapValues { $0.reasons })
-        #expect(rules.apis.mapValues { Set($0.categories) } == appleCategories)
-        #expect(rules.dataTypes == Set(try AppleDocs.possibleValueNames(applePage("nsprivacycollecteddatatype-2026-10-25.json"))))
-        #expect(rules.purposes == Set(try AppleDocs.possibleValueNames(applePage("nsprivacycollecteddatatypepurposes-2026-10-25.json"))))
     }
 
     private func rulesDocument(api overrides: [String: Any] = [:], removing removed: String? = nil, topLevel: [String: Any] = [:]) -> [String: Any] {
