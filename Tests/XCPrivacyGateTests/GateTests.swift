@@ -221,6 +221,28 @@ struct GateTests {
         }
     }
 
+    @Test("a source in a symlinked target directory has one repository path in the index and string scans")
+    func symlinkedSourceHasOnePath() throws {
+        try withTemporaryDirectory { root in
+            let call = ["module": "Core", "file": "Pod/Classes/Clock.swift", "api": "systemUptime", "reason": "35F9.1", "purpose": "Measure elapsed time"]
+            let configFile = try makeGateRepository(at: root, try gateFiles(calls: [call]).merging([
+                "Package.swift": packageManifest(
+                    #"Package(name: "Sample", platforms: [.iOS(.v15)], targets: [.target(name: "Core", path: "Sources/Core", resources: [.process("PrivacyInfo.xcprivacy")])])"#
+                ),
+                "Pod/Classes/Clock.swift": "import Foundation\n\n"
+                    + #"public func uptime() -> (TimeInterval, Any?) { (ProcessInfo.processInfo.systemUptime, ProcessInfo.processInfo.value(forKey: "systemUptime")) }"#
+                    + "\n",
+                "Pod/Classes/PrivacyInfo.xcprivacy": privacyManifest([bootTime: "35F9.1"])
+            ]) { $1 })
+            try FileManager.default.createDirectory(at: root.appending(path: "Sources"), withIntermediateDirectories: true)
+            try FileManager.default.createSymbolicLink(atPath: root.appending(path: "Sources/Core").path, withDestinationPath: "../Pod/Classes")
+
+            let violations = try check(configFile).violations
+
+            #expect(violations.isEmpty)
+        }
+    }
+
     @Test("a package below a repository root reached through a symlink keeps findings, usage.json entries and annotations repository-relative")
     func packageBelowRepositoryRoot() throws {
         try withTemporaryDirectory { directory in
