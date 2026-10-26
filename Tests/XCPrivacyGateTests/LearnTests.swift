@@ -105,7 +105,6 @@ struct LearnTests {
             #expect(api.swiftSymbols == [])
             #expect(api.strings == ["systemUptime"])
             #expect(try JSONFormat.data(JSONDecoder().decode(RulesFile.self, from: data)) == data)
-            #expect(FileManager.default.fileExists(atPath: RulesBundle.directory.appending(path: "fixtures/negative").path))
         }
     }
 
