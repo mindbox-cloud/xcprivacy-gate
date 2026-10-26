@@ -24,6 +24,10 @@ struct XCPrivacyGateCommand: ParsableCommand {
         }
     }
 
+    func run() throws {
+        throw ValidationError("a subcommand is required")
+    }
+
     private static func finish(with error: Error) -> Never {
         if exitCode(for: error) == .success {
             print(fullMessage(for: error))
