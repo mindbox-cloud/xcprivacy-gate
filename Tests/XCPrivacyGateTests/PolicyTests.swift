@@ -6,7 +6,7 @@ private let userDefaults = "NSPrivacyAccessedAPICategoryUserDefaults"
 private let diskSpace = "NSPrivacyAccessedAPICategoryDiskSpace"
 private let bootTime = "NSPrivacyAccessedAPICategorySystemBootTime"
 private let fileTimestamp = "NSPrivacyAccessedAPICategoryFileTimestamp"
-private let loader = "Core/Storage/StorageLoader/StorageLoader.swift"
+private let loader = "Core/Storage/DiskCache.swift"
 private let webViewSuite = "com.example.sdk.localState"
 private let evidenceURL = "https://example.invalid/itms-91053"
 
@@ -307,9 +307,9 @@ struct PolicyTests {
     @Test("a target without a manifest that uses an API is reported")
     func targetWithoutManifestUsingApiIsReported() {
         let violations = policy(registry()).evaluate(
-            targets: [target("SDKVersionProvider", manifest: false)],
+            targets: [target("BuildInfo", manifest: false)],
             source: [:],
-            binary: ["SDKVersionProvider": uses(compiled("mach_absolute_time", [bootTime]))],
+            binary: ["BuildInfo": uses(compiled("mach_absolute_time", [bootTime]))],
             manifests: [:]
         )
 
@@ -364,18 +364,18 @@ struct PolicyTests {
         let source = [
             "Core": uses(
                 finding("systemFreeSize", [diskSpace], file: loader, line: 28),
-                finding("UserDefaults", [userDefaults], file: "Core/DI/Injections/InjectReplaceable.swift", line: 42),
+                finding("UserDefaults", [userDefaults], file: "Core/Storage/SharedDefaults.swift", line: 42),
                 standard: true,
                 suites: [webViewSuite]
             ),
             "Notifications": uses(),
             "Logger": uses(),
-            "SDKVersionProvider": uses()
+            "BuildInfo": uses()
         ]
         let usage = try Usage.load(testData("usage/registry.json"), rules: rules, userDefaultsAppGroup: true)
 
         let violations = policy(usage).evaluate(
-            targets: names.map { target($0) } + [target("SDKVersionProvider", manifest: false)],
+            targets: names.map { target($0) } + [target("BuildInfo", manifest: false)],
             source: source,
             binary: [:],
             manifests: manifests

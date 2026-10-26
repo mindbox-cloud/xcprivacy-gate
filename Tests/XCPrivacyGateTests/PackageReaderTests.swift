@@ -31,10 +31,10 @@ private func fourTargetPackage(root: URL) -> DescribedPackage {
         return DescribedTarget(name: name, path: name, sources: sources, resources: manifest ? [resource] : nil)
     }
     return DescribedPackage(path: root.path, targets: [
-        target("SDKVersionProvider", sources: ["SDKVersionProvider.swift"], manifest: false),
-        target("Notifications", sources: ["NotificationService.swift", "Models/ImageFormat.swift"], manifest: true),
-        target("Logger", sources: ["Network/Enums/SDKLogsStatus.swift"], manifest: true),
-        target("Core", sources: ["CoreController/CoreController.swift", "Core.swift"], manifest: true)
+        target("BuildInfo", sources: ["BuildInfo.swift"], manifest: false),
+        target("Notifications", sources: ["NotificationService.swift", "Models/Attachment.swift"], manifest: true),
+        target("Logger", sources: ["Levels/LogLevel.swift"], manifest: true),
+        target("Core", sources: ["Client/Client.swift", "Core.swift"], manifest: true)
     ])
 }
 
@@ -68,15 +68,15 @@ struct PackageReaderTests {
             #expect(description.root.path == root.path)
             #expect(description.violations.isEmpty)
             let targets = Dictionary(uniqueKeysWithValues: description.targets.map { ($0.name, $0) })
-            #expect(Set(targets.keys) == ["Core", "Notifications", "SDKVersionProvider", "Logger"])
+            #expect(Set(targets.keys) == ["Core", "Notifications", "BuildInfo", "Logger"])
             let core = try #require(targets["Core"])
             #expect(core.sources.map(\.path) == [
-                root.appendingPathComponent("Core/CoreController/CoreController.swift").path,
+                root.appendingPathComponent("Core/Client/Client.swift").path,
                 root.appendingPathComponent("Core/Core.swift").path
             ])
             #expect(core.manifest?.path == root.appendingPathComponent("Core/PrivacyInfo.xcprivacy").path)
-            let provider = try #require(targets["SDKVersionProvider"])
-            #expect(provider.manifest == nil)
+            let buildInfo = try #require(targets["BuildInfo"])
+            #expect(buildInfo.manifest == nil)
         }
     }
 
@@ -139,7 +139,7 @@ struct PackageReaderTests {
             #expect(violation.message.contains("Native/\(file)"))
             #expect(violation.file == root.appendingPathComponent("Logger/Native/\(file)").path)
             let logger = try #require(description.targets.first { $0.name == "Logger" })
-            #expect(logger.sources.map(\.lastPathComponent) == ["SDKLogsStatus.swift"])
+            #expect(logger.sources.map(\.lastPathComponent) == ["LogLevel.swift"])
         }
     }
 

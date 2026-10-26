@@ -2,7 +2,7 @@
   "calls" : [
     {
       "api" : "systemFreeSize",
-      "file" : "Core/Storage/StorageLoader/StorageLoader.swift",
+      "file" : "Core/Storage/DiskCache.swift",
       "module" : "Core",
       "purpose" : "Check free space before reopening the store; fall back to an in-memory store when space is low",
       "reason" : "E174.1"

@@ -5,7 +5,7 @@ import XCPrivacyGateRules
 
 private let diskSpace = "NSPrivacyAccessedAPICategoryDiskSpace"
 private let localState = "com.example.sdk.localState"
-private let loader = "Core/Storage/StorageLoader.swift"
+private let loader = "Core/Storage/DiskCache.swift"
 
 private struct Literal: Equatable {
     let value: String
