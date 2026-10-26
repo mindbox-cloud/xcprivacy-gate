@@ -24,6 +24,13 @@ struct SDKListTests {
         #expect(names.last == "webview_flutter_wkwebview")
     }
 
+    @Test("the list is found under the heading at any heading level", arguments: ["h2", "h3", "h4"])
+    func listFoundUnderAnyHeadingLevel(level: String) throws {
+        let page = "<html><body><\(level)>\(heading)</\(level)><p>Commonly used SDKs.</p><ul><li>Abseil</li><li>Sample</li></ul></body></html>"
+
+        #expect(try SDKList.names(page: Data(page.utf8)) == ["Abseil", "Sample"])
+    }
+
     @Test("a page without the heading is a tool error naming the heading")
     func pageWithoutHeadingIsAnError() throws {
         let page = "<html><body><h4>Signatures for SDKs</h4><ul><li>Sample</li></ul></body></html>"

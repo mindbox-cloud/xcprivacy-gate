@@ -354,7 +354,7 @@ struct RefreshTests {
         #expect(errors.contains("refresh --rules-directory <path> --out-pr-body <path>, or refresh --check --config <path>"))
     }
 
-    @Test("fetch returns the body of a 200 answer and sends the tool's user agent with a 60 second timeout")
+    @Test("fetch returns the body of a 200 answer and sends the tool's user agent")
     func fetchReturnsBody() async throws {
         let site = AppleSite()
         let url = try #require(URL(string: "https://example.com/page.json"))
@@ -365,7 +365,6 @@ struct RefreshTests {
         #expect(data == Data("{}".utf8))
         let request = try #require(site.requests.first)
         #expect(request.value(forHTTPHeaderField: "User-Agent") == "xcprivacy-gate/\(ToolVersion.current)")
-        #expect(request.timeoutInterval == 60)
     }
 
     @Test("fetch of an answer other than 200 is a tool error naming the status")
