@@ -42,7 +42,7 @@ let package = Package(
         ),
         .testTarget(
             name: "XCPrivacyGateTests",
-            dependencies: ["XCPrivacyGate", "XCPrivacyGateRules"],
+            dependencies: ["XCPrivacyGate", "XCPrivacyGateRules", "xcprivacy-gate"],
             resources: [.copy("Data")]
         )
     ],

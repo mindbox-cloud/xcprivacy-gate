@@ -1,6 +1,7 @@
 import Foundation
 import Testing
 import XCPrivacyGate
+@testable import xcprivacy_gate
 
 let repositoryRoot = URL(fileURLWithPath: #filePath)
     .deletingLastPathComponent()
@@ -45,6 +46,15 @@ func writeFiles(_ files: [String: String], to root: URL) throws {
         try FileManager.default.createDirectory(at: file.deletingLastPathComponent(), withIntermediateDirectories: true)
         try Data(contents.utf8).write(to: file)
     }
+}
+
+func runCommand(_ arguments: [String], stepSummary: String?) {
+    if let stepSummary {
+        setenv("GITHUB_STEP_SUMMARY", stepSummary, 1)
+    } else {
+        unsetenv("GITHUB_STEP_SUMMARY")
+    }
+    XCPrivacyGateCommand.main(arguments)
 }
 
 func testData(_ path: String) throws -> URL {

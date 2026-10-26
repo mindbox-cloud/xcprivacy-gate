@@ -97,6 +97,20 @@ struct SelfTestTests {
         #expect(violations.first?.message.contains("fixtures/none.swift") == true)
     }
 
+    @Test("self-test exits 0 and writes its summary to a new step summary file")
+    func selfTestCommandWritesStepSummary() async throws {
+        let directory = try makeTemporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let summary = directory.appending(path: "step-summary.md")
+
+        let result = try await #require(processExitsWith: .success, observing: [\.standardOutputContent]) { [summary = summary.path as String?] in
+            runCommand(["self-test"], stepSummary: summary)
+        }
+
+        #expect(String(bytes: result.standardOutputContent, encoding: .utf8) == "Privacy manifest gate, self-test: 0 violations\n")
+        #expect(try String(contentsOf: summary, encoding: .utf8) == "### Privacy manifest gate, self-test: 0 violations\n\n\n")
+    }
+
     @Suite("on the compiled fixtures", .compiledFixtures)
     struct CompiledFixtureTests {
         @Test("a fixture the rule no longer finds is missed in the source lane, every object and every linked library")

@@ -71,6 +71,35 @@ struct GateConfigTests {
         }
     }
 
+    @Test("the repository root is the canonical directory that holds .github, also when packagePath points below it")
+    func repositoryRootHoldsGithub() throws {
+        try withTemporaryDirectory { root in
+            let url = try writeConfig(
+                #"{"usage": "usage.json", "packagePath": "../../SDK", "policy": {"userDefaultsAppGroup": true, "trackingDisabled": true}}"#,
+                at: ".github/privacy-manifest/config.json",
+                in: root
+            )
+
+            let config = try GateConfig.load(url)
+
+            #expect(try config.repositoryRoot.path == canonical(root).path)
+            #expect(config.packagePath.path == root.appendingPathComponent("SDK").standardizedFileURL.path)
+        }
+    }
+
+    @Test("without a .github directory the repository root is the canonical package path")
+    func repositoryRootWithoutGithubIsPackagePath() throws {
+        try withTemporaryDirectory { root in
+            let package = root.appendingPathComponent("pkg", isDirectory: true)
+            try FileManager.default.createDirectory(at: package, withIntermediateDirectories: true)
+            let url = try writeConfig(validConfig.replacingOccurrences(of: #""packagePath": ".""#, with: #""packagePath": "../pkg""#), at: "config/config.json", in: root)
+
+            let config = try GateConfig.load(url)
+
+            #expect(try config.repositoryRoot.path == canonical(package).path)
+        }
+    }
+
     @Test("a missing policy key is a tool error naming it", arguments: ["policy.userDefaultsAppGroup", "policy.trackingDisabled"])
     func missingPolicyKeyIsAnError(key: String) throws {
         try withTemporaryDirectory { root in
@@ -133,6 +162,7 @@ struct GateConfigTests {
             let message = try loadErrorMessage(root.appendingPathComponent("absent.json"))
 
             #expect(message.contains("absent.json"))
+            #expect(message.contains("cannot read the config"))
         }
     }
 
