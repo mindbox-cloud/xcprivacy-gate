@@ -142,6 +142,8 @@ package struct RulesFile: Codable, Equatable, Sendable {
 }
 
 extension RulesFile {
+    package static let fileName = "rules.json"
+
     static func load(_ url: URL) throws -> (file: RulesFile, rules: Rules) {
         let path = url.standardizedFileURL
         do {

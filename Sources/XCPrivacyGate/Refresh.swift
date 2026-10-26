@@ -41,20 +41,18 @@ package enum ApplePage: Sendable {
 }
 
 package enum Refresh {
-    private static let rulesFileName = "rules.json"
-
     package static func run(rulesDirectory: URL, session: URLSession) async throws -> RefreshResult {
-        let saved = try RulesFile.load(rulesDirectory.appending(path: rulesFileName)).file
+        let saved = try RulesFile.load(rulesDirectory.appending(path: RulesFile.fileName)).file
         let comparison = try await RulesComparison(saved: saved, rulesDirectory: rulesDirectory, pages: ApplePages.fetch(session: session))
         guard !comparison.changes.isEmpty else {
             return RefreshResult(changed: false, body: "")
         }
-        try comparison.write(to: rulesDirectory, rulesFileName: rulesFileName)
+        try comparison.write(to: rulesDirectory)
         return RefreshResult(changed: true, body: comparison.pullRequestBody)
     }
 
     package static func check(config: GateConfig, rulesDirectory: URL, session: URLSession) async throws -> (title: String, violations: [Violation]) {
-        let (saved, rules) = try RulesFile.load(rulesDirectory.appending(path: rulesFileName))
+        let (saved, rules) = try RulesFile.load(rulesDirectory.appending(path: RulesFile.fileName))
         let usage = try Usage.load(config.usage, rules: rules, userDefaultsAppGroup: config.userDefaultsAppGroup)
         let package = try PackageReader.read(root: config.packagePath)
         let declared = declaredReasons(manifests: Gate.manifests(of: package, rules: rules, trackingDisabled: config.trackingDisabled).manifests, usage: usage)

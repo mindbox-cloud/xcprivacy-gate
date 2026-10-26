@@ -66,9 +66,9 @@ struct RulesComparison {
         return lines.joined(separator: "\n") + "\n"
     }
 
-    func write(to rulesDirectory: URL, rulesFileName: String) throws {
+    func write(to rulesDirectory: URL) throws {
         if let rules {
-            try JSONFormat.data(rules).write(to: rulesDirectory.appending(path: rulesFileName), options: .atomic)
+            try JSONFormat.data(rules).write(to: rulesDirectory.appending(path: RulesFile.fileName), options: .atomic)
         }
         for (path, text) in texts {
             try Data(text.utf8).write(to: rulesDirectory.appending(path: path), options: .atomic)

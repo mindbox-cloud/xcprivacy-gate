@@ -85,7 +85,7 @@ struct LearnCommand: ParsableCommand {
     var rulesDirectory: String
 
     func run() throws {
-        let rulesFile = URL(fileURLWithPath: rulesDirectory, isDirectory: true).appending(path: "rules.json")
+        let rulesFile = URL(fileURLWithPath: rulesDirectory, isDirectory: true).appending(path: RulesFile.fileName)
         try Learn.update(rulesFile: rulesFile, api: api)
         print("\(rulesFile.path): learned \(api ?? "every API")")
     }
@@ -131,7 +131,7 @@ struct RefreshCommand: AsyncParsableCommand {
 }
 
 private func bundledRules() throws -> Rules {
-    try Rules.load(RulesBundle.directory.appending(path: "rules.json"))
+    try Rules.load(RulesBundle.directory.appending(path: RulesFile.fileName))
 }
 
 private func conclude(title: String, violations: [Violation], root: URL) throws -> Never {
