@@ -99,7 +99,7 @@ comment, as above.
 | `packagePath` | no | the directory that holds `Package.swift`, relative to the config; by default the root of the git checkout that holds the config |
 | `policy.userDefaultsAppGroup` | yes | `true`: UserDefaults follows a fixed policy instead of `usage.json`. Any use needs `1C8F.1`, because the SDK keeps its data in an App Group suite; `UserDefaults.standard` or a suite listed in `privateUserDefaultsSuites` also needs `CA92.1`; no other UserDefaults reason is allowed. `false`: UserDefaults calls are registered like any other API |
 | `policy.trackingDisabled` | yes | `true`: every manifest declares `NSPrivacyTracking` as `false`, lists no tracking domains and no tracked data |
-| `appleSdkList` | no | `name` and `listed`: whether Apple's [list of SDKs that require a privacy manifest and signature](https://developer.apple.com/support/third-party-SDK-requirements/) names this SDK, as you last reviewed it. `check` compares it with the list bundled with the tool; `refresh --check` compares it with the live page |
+| `appleSdkList` | no | `name` and `listed`: whether Apple's [list of SDKs that require a privacy manifest and signature](https://developer.apple.com/support/third-party-SDK-requirements/) names this SDK, as you last reviewed it. Only `refresh --check` reads it and compares it with the live page; `check` ignores it |
 
 Unknown keys are a tool error.
 
@@ -178,7 +178,7 @@ summary is also appended to the job summary.
 | `TRACKING_ENABLED`, `TRACKING_DOMAINS` | tracking breaks the `trackingDisabled` policy, or the tracking domains do not match `NSPrivacyTracking` |
 | `MANIFEST_NOT_WIRED` | a manifest at the target's root is not shipped as a resource: `Package.swift` does not list it, or names it in another case |
 | `PACKAGE_DEPENDENCY`, `UNSCANNABLE_SOURCE` | the package has code the gate cannot read (see [Limitations](#limitations)) |
-| `SDK_ON_APPLE_LIST`, `SDK_OFF_APPLE_LIST` | Apple's SDK list disagrees with `appleSdkList` |
+| `SDK_ON_APPLE_LIST`, `SDK_OFF_APPLE_LIST` | `refresh --check`: Apple's live SDK list disagrees with `appleSdkList` |
 | `DECLARED_REASON_CHANGED` | `refresh --check`: Apple changed the condition of a reason the SDK declares |
 | `RULE_INCOMPLETE`, `FIXTURE_MISSED`, `FIXTURE_CROSSTALK`, `NEGATIVE_HIT` | `self-test`: a rule lacks data, misses its fixture, matches another API's fixture, or matches code that is not a call |
 

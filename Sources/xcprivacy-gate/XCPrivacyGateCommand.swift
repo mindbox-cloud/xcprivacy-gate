@@ -55,7 +55,7 @@ struct CheckCommand: ParsableCommand {
 
     func run() throws {
         let gateConfig = try GateConfig.load(URL(fileURLWithPath: config))
-        let result = try Gate.check(config: gateConfig, rules: bundledRules(), appleSdks: SDKList.read(RulesBundle.directory.appending(path: SDKList.fileName)), today: Date())
+        let result = try Gate.check(config: gateConfig, rules: bundledRules(), today: Date())
         try conclude(title: result.title, violations: result.violations, root: gateConfig.repositoryRoot)
     }
 }

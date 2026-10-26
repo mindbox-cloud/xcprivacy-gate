@@ -1,11 +1,11 @@
 import Foundation
 
 package enum Gate {
-    package static func check(config: GateConfig, rules: Rules, appleSdks: [String], today: Date) throws -> (title: String, violations: [Violation]) {
+    package static func check(config: GateConfig, rules: Rules, today: Date) throws -> (title: String, violations: [Violation]) {
         let usage = try Usage.load(config.usage, rules: rules, userDefaultsAppGroup: config.userDefaultsAppGroup)
         let package = try PackageReader.read(root: config.packagePath)
         let declared = manifests(of: package, rules: rules, trackingDisabled: config.trackingDisabled)
-        var violations = [SDKList.violation(names: appleSdks, expected: config.appleSdkList)].compactMap { $0 } + package.violations + declared.violations
+        var violations = package.violations + declared.violations
         let use = try WorkDirectory.with { work in
             try scan(package, rules: rules, usage: usage, root: config.repositoryRoot, work: work)
         }

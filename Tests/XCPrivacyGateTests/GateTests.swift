@@ -32,7 +32,6 @@ private func check(_ configFile: URL) throws -> (config: GateConfig, title: Stri
     let result = try Gate.check(
         config: config,
         rules: Rules.load(RulesBundle.directory.appending(path: "rules.json")),
-        appleSdks: SDKList.read(RulesBundle.directory.appending(path: SDKList.fileName)),
         today: Date()
     )
     return (config, result.title, result.violations)
@@ -182,20 +181,19 @@ struct GateTests {
         }
     }
 
-    @Test("check puts SDK_ON_APPLE_LIST first when the bundled Apple list names the SDK that the config marks as not listed")
-    func bundledAppleListNamesConfiguredSdk() throws {
-        let listed = try #require(SDKList.read(RulesBundle.directory.appending(path: SDKList.fileName)).first)
+    @Test(
+        "check leaves appleSdkList to refresh --check, whatever the bundled Apple list says",
+        arguments: [("Alamofire", false), ("Sample", true)]
+    )
+    func checkLeavesAppleSdkListToRefresh(name: String, listed: Bool) throws {
         try withTemporaryDirectory { root in
-            let configFile = try makeGateRepository(at: root, try gateFiles(appleSdkList: ["name": listed, "listed": false]).merging([
+            let configFile = try makeGateRepository(at: root, try gateFiles(appleSdkList: ["name": name, "listed": listed]).merging([
                 "Package.swift": libPackage,
                 "Lib/Clock.swift": clock,
                 "Lib/PrivacyInfo.xcprivacy": privacyManifest([bootTime: "35F9.1"])
             ]) { $1 })
 
-            let violations = try check(configFile).violations
-
-            #expect(violations.map(\.code) == ["SDK_ON_APPLE_LIST", "UNREGISTERED_CALL"])
-            #expect(violations.first?.message.contains("names \(listed)") == true)
+            #expect(try check(configFile).violations.map(\.code) == ["UNREGISTERED_CALL"])
         }
     }
 
