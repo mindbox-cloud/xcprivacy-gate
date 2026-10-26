@@ -36,8 +36,8 @@ func relativeFiles(under directory: URL) throws -> Set<String> {
     return files
 }
 
-func packageManifest(_ package: String) -> String {
-    "// swift-tools-version:5.9\nimport PackageDescription\n\nlet package = \(package)\n"
+func packageManifest(_ package: String, toolsVersion: String = "5.9") -> String {
+    "// swift-tools-version:\(toolsVersion)\nimport PackageDescription\n\nlet package = \(package)\n"
 }
 
 func writeFile(_ contents: String, to file: URL) throws {

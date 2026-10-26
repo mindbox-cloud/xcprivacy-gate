@@ -164,19 +164,20 @@ private func appendToTN3181(_ document: NSDictionary, _ block: [String: Any]) th
     try #require(section["content"] as? NSMutableArray).add(block)
 }
 
-private func makeSampleRepository(usage calls: [[String: String]], appleSdkList: [String: Any]?) throws -> URL {
+private func makeSampleRepository(usage calls: [[String: String]], appleSdkList: [String: Any]?, listsManifests: Bool = true) throws -> URL {
     let root = try makeTemporaryDirectory()
+    let resources = listsManifests ? #", resources: [.process("PrivacyInfo.xcprivacy")]"# : ""
     _ = try makeGateRepository(at: root, gateFiles(userDefaultsAppGroup: true, calls: calls, appleSdkList: appleSdkList).merging([
         "Package.swift": packageManifest("""
             Package(
                 name: "Sample",
                 platforms: [.iOS(.v15)],
                 targets: [
-                    .target(name: "Core", path: "Core", resources: [.process("PrivacyInfo.xcprivacy")]),
-                    .target(name: "Logger", path: "Logger", resources: [.process("PrivacyInfo.xcprivacy")])
+                    .target(name: "Core", path: "Core"\(resources)),
+                    .target(name: "Logger", path: "Logger"\(resources))
                 ]
             )
-            """),
+            """, toolsVersion: listsManifests ? "5.9" : "6.0"),
         "Core/Core.swift": "public let core = 1\n",
         "Core/PrivacyInfo.xcprivacy": String(contentsOf: testData("manifests/Core.xcprivacy"), encoding: .utf8),
         "Logger/Logger.swift": "public let logger = 1\n",
@@ -397,6 +398,25 @@ struct RefreshTests {
         #expect(defaults.hasSuffix(" Updated.\" (https://developer.apple.com/documentation/bundleresources/app-privacy-configuration/nsprivacyaccessedapitypes/nsprivacyaccessedapitype)"))
         #expect(!violations.contains { $0.message.contains("3EC4.1") })
         #expect(try snapshot(directory) == before)
+    }
+
+    @Test("refresh --check reads the reasons of manifests that tools-version 6 ships without a resources entry")
+    func checkReadsUnlistedManifests() async throws {
+        var pages = try SavedPages()
+        try pages.editJSON(.requiredReasons) { document in
+            try appendToCondition(document, userDefaults, "CA92.1", text: " Updated.")
+        }
+        let repository = try makeSampleRepository(usage: [], appleSdkList: nil, listsManifests: false)
+        let directory = try pages.rulesDirectory()
+        defer {
+            try? FileManager.default.removeItem(at: repository)
+            try? FileManager.default.removeItem(at: directory)
+        }
+
+        let violations = try await refreshCheck(pages, repository: repository, rulesDirectory: directory).violations
+
+        #expect(violations.map(\.code) == ["DECLARED_REASON_CHANGED"])
+        #expect(violations.first?.message.contains("Core manifest, Logger manifest") == true)
     }
 
     @Test("refresh --check reads only the required-reasons page, and Apple's SDK page only for a config with appleSdkList", arguments: [false, true])

@@ -94,6 +94,20 @@ struct PackageReaderTests {
         }
     }
 
+    @Test("unlisted manifests are found in subdirectories but not in hidden ones, and the one at the target root is marked")
+    func unlistedManifestsSkipHiddenDirectories() throws {
+        try withSampleTree { root in
+            try writeFiles(["Logger/Resources/PrivacyInfo.xcprivacy": "<plist/>", "Logger/.build/Sample_Logger.bundle/PrivacyInfo.xcprivacy": "<plist/>"], to: root)
+            var package = fourTargetPackage(root: root)
+            package.targets[2].resources = nil
+
+            let unlisted = try #require(try readPackage(package).unlistedManifests["Logger"])
+
+            #expect(unlisted.files.map(\.path) == ["Logger/PrivacyInfo.xcprivacy", "Logger/Resources/PrivacyInfo.xcprivacy"].map { root.appendingPathComponent($0).path })
+            #expect(unlisted.atTargetRoot?.path == root.appendingPathComponent("Logger/PrivacyInfo.xcprivacy").path)
+        }
+    }
+
     @Test("a package dependency is PACKAGE_DEPENDENCY")
     func packageDependencyIsReported() throws {
         try withSampleTree { root in

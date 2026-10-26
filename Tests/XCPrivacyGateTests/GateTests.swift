@@ -19,6 +19,9 @@ private func privacyManifest(_ reasons: [String: String]) -> String {
         + "<plist version=\"1.0\"><dict><key>NSPrivacyTracking</key><false/><key>NSPrivacyAccessedAPITypes</key><array>\(entries.joined())</array></dict></plist>\n"
 }
 
+private let emptyManifest = #"<?xml version="1.0" encoding="UTF-8"?>"# + "\n"
+    + "<plist version=\"1.0\"><dict><key>NSPrivacyTracking</key><false/></dict></plist>\n"
+
 private let trackingManifest = #"<?xml version="1.0" encoding="UTF-8"?>"# + "\n"
     + "<plist version=\"1.0\"><dict><key>NSPrivacyTracking</key><true/>"
     + "<key>NSPrivacyTrackingDomains</key><array><string>tracker.example.com</string></array></dict></plist>\n"
@@ -194,6 +197,94 @@ struct GateTests {
             ]) { $1 })
 
             #expect(try check(configFile).violations.map(\.code) == ["UNREGISTERED_CALL"])
+        }
+    }
+
+    @Test(
+        "a manifest that tools-version 6 ships without a resources entry is the target's manifest, at the target root and in a subdirectory",
+        arguments: ["PrivacyInfo.xcprivacy", "Resources/PrivacyInfo.xcprivacy"]
+    )
+    func manifestShippedWithoutResourcesEntryIsChecked(file: String) throws {
+        try withTemporaryDirectory { root in
+            let configFile = try makeGateRepository(at: root, try gateFiles(calls: [bootTimeCall("mach_absolute_time", in: "Lib/Clock.swift")]).merging([
+                "Package.swift": packageManifest(
+                    #"Package(name: "Sample", platforms: [.iOS(.v15)], targets: [.target(name: "Lib", path: "Lib")])"#,
+                    toolsVersion: "6.0"
+                ),
+                "Lib/Clock.swift": clock,
+                "Lib/\(file)": privacyManifest([bootTime: "35F9.1"])
+            ]) { $1 })
+
+            #expect(try check(configFile).violations.map(\.code) == [])
+        }
+    }
+
+    @Test(
+        "a manifest at the target root that the build does not ship is MANIFEST_NOT_WIRED, unlisted and named in another case",
+        arguments: [
+            ("PrivacyInfo.xcprivacy", ""),
+            ("privacyinfo.xcprivacy", #", resources: [.process("PrivacyInfo.xcprivacy")]"#)
+        ]
+    )
+    func manifestTheBuildDoesNotShipIsNotWired(file: String, resources: String) throws {
+        try withTemporaryDirectory { root in
+            let configFile = try makeGateRepository(at: root, try gateFiles().merging([
+                "Package.swift": packageManifest(
+                    #"Package(name: "Sample", platforms: [.iOS(.v15)], targets: [.target(name: "Lib", path: "Lib"\#(resources))])"#
+                ),
+                "Lib/Answer.swift": "public let answer = 42\n",
+                "Lib/\(file)": privacyManifest([:])
+            ]) { $1 })
+
+            let (config, _, violations) = try check(configFile)
+
+            #expect(violations.map(\.code) == ["MANIFEST_NOT_WIRED"])
+            #expect(violations.first.map { Report.annotation($0, root: config.repositoryRoot) }
+                == "::error file=Lib/\(file),title=MANIFEST_NOT_WIRED::Lib: Lib/\(file) is not shipped as a resource of the target; "
+                + "check the file name's case and the target's resources in Package.swift")
+        }
+    }
+
+    @Test(
+        "a manifest that tools-version 6 ships through a symlink is the target's manifest, as a linked file and in a linked directory",
+        arguments: [("Lib/PrivacyInfo.xcprivacy", "../Shared/PrivacyInfo.xcprivacy"), ("Lib/Resources", "../Shared")]
+    )
+    func manifestShippedThroughSymlinkIsChecked(link: String, destination: String) throws {
+        try withTemporaryDirectory { root in
+            let configFile = try makeGateRepository(at: root, try gateFiles(calls: [bootTimeCall("mach_absolute_time", in: "Lib/Clock.swift")]).merging([
+                "Package.swift": packageManifest(
+                    #"Package(name: "Sample", platforms: [.iOS(.v15)], targets: [.target(name: "Lib", path: "Lib")])"#,
+                    toolsVersion: "6.0"
+                ),
+                "Lib/Clock.swift": clock,
+                "Shared/PrivacyInfo.xcprivacy": privacyManifest([bootTime: "35F9.1"])
+            ]) { $1 })
+            try FileManager.default.createSymbolicLink(atPath: root.appending(path: link).path, withDestinationPath: destination)
+
+            #expect(try check(configFile).violations.map(\.code) == [])
+        }
+    }
+
+    @Test("a manifest of a target nested in another target's directory is not MANIFEST_NOT_WIRED for the outer target")
+    func nestedTargetsManifestIsNotTheOuterTargets() throws {
+        try withTemporaryDirectory { root in
+            let configFile = try makeGateRepository(at: root, try gateFiles().merging([
+                "Package.swift": packageManifest("""
+                    Package(
+                        name: "Sample",
+                        platforms: [.iOS(.v15)],
+                        targets: [
+                            .target(name: "Core", path: "Sources", exclude: ["Ext"]),
+                            .target(name: "Ext", path: "Sources/Ext", resources: [.process("PrivacyInfo.xcprivacy")])
+                        ]
+                    )
+                    """),
+                "Sources/Core.swift": "public let core = 1\n",
+                "Sources/Ext/Ext.swift": "public let ext = 1\n",
+                "Sources/Ext/PrivacyInfo.xcprivacy": emptyManifest
+            ]) { $1 })
+
+            #expect(try check(configFile).violations.map(\.code) == [])
         }
     }
 
