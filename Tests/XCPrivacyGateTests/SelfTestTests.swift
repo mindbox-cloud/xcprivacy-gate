@@ -97,6 +97,16 @@ struct SelfTestTests {
         #expect(violations.first?.message.contains("fixtures/none.swift") == true)
     }
 
+    @Test("a rule without binary names makes the self-test run report it incomplete")
+    func runReportsIncompleteRule() throws {
+        let rules = try rulesWith(ApiRule(api: "systemUptime", docc: nil, categories: [bootTime], fixtures: [uptimeFixture], usrs: [uptimeUsr]))
+
+        let incomplete = try SelfTest.run(rules: rules, rulesDirectory: RulesBundle.directory).filter { $0.code == "RULE_INCOMPLETE" }
+
+        #expect(incomplete.count == 1)
+        #expect(incomplete.first?.message.contains("binary names") == true)
+    }
+
     @Test("self-test exits 0 and writes its summary to a new step summary file")
     func selfTestCommandWritesStepSummary() async throws {
         let directory = try makeTemporaryDirectory()
