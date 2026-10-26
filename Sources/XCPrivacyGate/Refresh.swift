@@ -52,17 +52,19 @@ package enum Refresh {
     }
 
     package static func check(config: GateConfig, rulesDirectory: URL, session: URLSession) async throws -> (title: String, violations: [Violation]) {
-        let (saved, rules) = try RulesFile.load(rulesDirectory.appending(path: RulesFile.fileName))
+        let rules = try Rules.load(rulesDirectory.appending(path: RulesFile.fileName))
         let usage = try Usage.load(config.usage, rules: rules, userDefaultsAppGroup: config.userDefaultsAppGroup)
         let package = try PackageReader.read(root: config.packagePath)
         let declared = declaredReasons(manifests: Gate.manifests(of: package, rules: rules, trackingDisabled: config.trackingDisabled).manifests, usage: usage)
-        let pages = try await ApplePages.fetch(session: session)
-        let comparison = try RulesComparison(saved: saved, rulesDirectory: rulesDirectory, pages: pages)
-        let conditions = comparison.conditions.compactMap { condition in
+        let changed = try await RulesComparison.conditions(saved: rules.categories, apple: ApplePages.categories(session: session))
+        var violations: [Violation] = []
+        if let listing = config.appleSdkList, let verdict = SDKList.violation(names: try await ApplePages.sdks(session: session), expected: listing) {
+            violations.append(verdict)
+        }
+        violations += changed.compactMap { condition in
             declared[condition.code].map { Violation(code: "DECLARED_REASON_CHANGED", module: nil, message: message(condition, declaredIn: $0)) }
         }
-        let verdict = [SDKList.violation(names: pages.sdks, expected: config.appleSdkList)].compactMap { $0 }
-        return (title: "refresh check of \(package.name)", violations: verdict + conditions)
+        return (title: "refresh check of \(package.name)", violations: violations)
     }
 
     package static func fetch(_ url: URL, session: URLSession) async throws -> Data {
@@ -114,20 +116,29 @@ struct ApplePages {
     let sdks: [String]
 
     static func fetch(session: URLSession) async throws -> ApplePages {
-        let required = try await document(.requiredReasons, session: session)
-        let reasons = try parsed(.requiredReasons) { try AppleDocs.requiredReasons(required) }
-        let order = try parsed(.requiredReasons) { try AppleDocs.possibleValueNames(required) }
+        let categories = try await categories(session: session)
         let dataTypes = try await document(.dataTypes, session: session)
         let purposes = try await document(.purposes, session: session)
         let tn3181 = try await document(.tn3181, session: session)
-        let sdkPage = try await Refresh.fetch(url(.sdkList), session: session)
+        let sdks = try await sdks(session: session)
         return try ApplePages(
-            categories: order.compactMap { name in reasons[name].map { (name, $0) } },
+            categories: categories,
             dataTypes: parsed(.dataTypes) { try AppleDocs.possibleValueNames(dataTypes) },
             purposes: parsed(.purposes) { try AppleDocs.possibleValueNames(purposes) },
             tn3181: parsed(.tn3181) { try AppleDocs.text(tn3181) },
-            sdks: SDKList.names(page: sdkPage)
+            sdks: sdks
         )
+    }
+
+    static func categories(session: URLSession) async throws -> [(name: String, body: AppleDocs.RequiredReasonCategory)] {
+        let required = try await document(.requiredReasons, session: session)
+        let reasons = try parsed(.requiredReasons) { try AppleDocs.requiredReasons(required) }
+        let order = try parsed(.requiredReasons) { try AppleDocs.possibleValueNames(required) }
+        return order.compactMap { name in reasons[name].map { (name, $0) } }
+    }
+
+    static func sdks(session: URLSession) async throws -> [String] {
+        try SDKList.names(page: await Refresh.fetch(url(.sdkList), session: session))
     }
 
     private static func document(_ page: ApplePage, session: URLSession) async throws -> [String: Any] {

@@ -155,7 +155,7 @@ summary is also appended to the job summary.
 |---|---|
 | `check --config <path>` | builds the package and checks it |
 | `self-test` | checks the bundled rules against their fixtures with the selected Xcode |
-| `refresh --check --config <path>` | reads Apple's pages and reports changed conditions of the reasons the SDK declares and Apple's current SDK-list verdict; writes nothing |
+| `refresh --check --config <path>` | reads Apple's required-reasons page, and its SDK list when the config has `appleSdkList`, and reports changed conditions of the reasons the SDK declares and Apple's current SDK-list verdict; writes nothing |
 | `learn [<api>] --rules-directory Rules` | for maintainers: compiles the fixtures and writes the names they produce into `Rules/rules.json` |
 | `refresh --rules-directory Rules --out-pr-body <path>` | for maintainers: updates the rules from Apple's pages |
 | `--version` | prints the version |

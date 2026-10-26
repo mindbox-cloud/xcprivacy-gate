@@ -42,8 +42,7 @@ package enum SDKList {
         return names
     }
 
-    package static func violation(names: [String], expected: AppleSDKListing?) -> Violation? {
-        guard let expected else { return nil }
+    package static func violation(names: [String], expected: AppleSDKListing) -> Violation? {
         let name = expected.name.trimmingCharacters(in: .whitespacesAndNewlines)
         let onList = names.contains { $0.trimmingCharacters(in: .whitespacesAndNewlines).caseInsensitiveCompare(name) == .orderedSame }
         switch (onList, expected.listed) {

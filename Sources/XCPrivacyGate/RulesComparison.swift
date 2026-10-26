@@ -17,16 +17,14 @@ struct RulesComparison {
     private static let tn3181File = "apple/tn3181.txt"
 
     let changes: [RefreshChange]
-    let conditions: [ConditionChange]
     private let rules: RulesFile?
     private let texts: [String: String]
     private let tn3181Diff: [String]
 
     init(saved: RulesFile, rulesDirectory: URL, pages: ApplePages) throws {
         var changes: [RefreshChange] = []
-        var conditions: [ConditionChange] = []
         let rules = try RulesFile(
-            categories: Self.categories(saved.categories, apple: pages.categories, changes: &changes, conditions: &conditions),
+            categories: Self.categories(saved.categories.mapValues(\.reasons), apple: pages.categories, changes: &changes).reasons,
             apis: Self.apis(saved.apis, apple: pages.categories, changes: &changes),
             collectedDataTypes: Self.names(saved.collectedDataTypes, apple: pages.dataTypes, key: "collectedDataTypes", page: .dataTypes, changes: &changes),
             purposes: Self.names(saved.purposes, apple: pages.purposes, key: "purposes", page: .purposes, changes: &changes)
@@ -45,7 +43,6 @@ struct RulesComparison {
             changes += savedSdks.filter { !pages.sdks.contains($0) }.map { RefreshChange(text: "Apple's SDK list no longer names `\($0)`", page: .sdkList) }
         }
         self.changes = changes
-        self.conditions = conditions
         self.rules = rules == saved ? nil : rules
         self.texts = texts
         tn3181Diff = Self.lineDiff(from: savedNote, to: pages.tn3181)
@@ -75,18 +72,23 @@ struct RulesComparison {
         }
     }
 
+    static func conditions(saved: [String: [String: String]], apple: [(name: String, body: AppleDocs.RequiredReasonCategory)]) throws -> [ConditionChange] {
+        var changes: [RefreshChange] = []
+        return try categories(saved, apple: apple, changes: &changes).conditions
+    }
+
     private static func categories(
-        _ saved: [String: CategoryReasons],
+        _ saved: [String: [String: String]],
         apple: [(name: String, body: AppleDocs.RequiredReasonCategory)],
-        changes: inout [RefreshChange],
-        conditions: inout [ConditionChange]
-    ) throws -> [String: CategoryReasons] {
+        changes: inout [RefreshChange]
+    ) throws -> (reasons: [String: CategoryReasons], conditions: [ConditionChange]) {
+        var conditions: [ConditionChange] = []
         let lost = saved.keys.filter { name in !apple.contains { $0.name == name } }.pythonSorted()
         guard lost.isEmpty else {
             throw shrink("Apple's list lost categories \(lost)")
         }
         for (category, body) in apple {
-            let old = saved[category]?.reasons ?? [:]
+            let old = saved[category] ?? [:]
             if saved[category] == nil {
                 changes.append(RefreshChange(text: "New category `\(category)`", page: .requiredReasons))
             }
@@ -105,7 +107,7 @@ struct RulesComparison {
                 }
             }
         }
-        return Dictionary(apple.map { ($0.name, CategoryReasons(reasons: $0.body.reasons)) }) { first, _ in first }
+        return (Dictionary(apple.map { ($0.name, CategoryReasons(reasons: $0.body.reasons)) }) { first, _ in first }, conditions)
     }
 
     private static func apis(

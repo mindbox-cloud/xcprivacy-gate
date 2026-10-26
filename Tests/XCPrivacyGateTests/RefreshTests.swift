@@ -412,7 +412,6 @@ struct RefreshTests {
             try? FileManager.default.removeItem(at: repository)
             try? FileManager.default.removeItem(at: directory)
         }
-        try Data().write(to: directory.appending(path: SDKList.fileName))
 
         let violations = try await refreshCheck(pages, repository: repository, rulesDirectory: directory).violations
 

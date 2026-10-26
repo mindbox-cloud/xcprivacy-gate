@@ -84,9 +84,4 @@ struct SDKListTests {
 
         #expect(violation?.code == code)
     }
-
-    @Test("a config without appleSdkList gets no verdict")
-    func noAppleSdkListGetsNoVerdict() throws {
-        #expect(try SDKList.violation(names: savedNames(), expected: nil) == nil)
-    }
 }
