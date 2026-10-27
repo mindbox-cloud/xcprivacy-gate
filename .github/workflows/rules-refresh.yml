@@ -19,10 +19,17 @@ jobs:
     env:
       BRANCH: bot/apple-privacy-rules
     steps:
+      - id: app-token
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
+        with:
+          client-id: ${{ vars.MOBILE_CI_APP_CLIENT_ID }}
+          private-key: ${{ secrets.MOBILE_CI_APP_PRIVATE_KEY }}
+          permission-contents: write
+          permission-pull-requests: write
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: main
-          token: ${{ secrets.PAT_FOR_TRIGGERING_BRANCH_PROTECTION }}
+          token: ${{ steps.app-token.outputs.token }}
       - uses: maxim-lobanov/setup-xcode@ed7a3b1fda3918c0306d1b724322adc0b8cc0a90 # v1.7.0
         with:
           xcode-version: latest-stable
@@ -30,7 +37,7 @@ jobs:
         run: swift build -c release --force-resolved-versions
       - name: Open or update the rules PR
         env:
-          GH_TOKEN: ${{ secrets.PAT_FOR_TRIGGERING_BRANCH_PROTECTION }}
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
           BASE_BRANCH: main
           BODY: ${{ runner.temp }}/pr-body.md
         run: bash scripts/rules-pr.sh .build/release/xcprivacy-gate
